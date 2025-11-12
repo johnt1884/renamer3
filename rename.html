@@ -38,14 +38,38 @@
         }
         .right-sidebar {
             width: 250px;
-            padding: 10px;
+            padding: 0;
             border-left: 1px solid #444444;
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
             position: relative;
-            background-color: #f0f0f0;
+            background-color: #EBEBEB;
             color: black;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            border-bottom: 1px solid #444444;
+            height: 36px;
+            box-sizing: border-box;
+            background-color: #1877f2;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .preview-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        #preview-container {
+            flex-grow: 1;
+            padding: 10px;
+            position: relative;
             overflow-y: auto;
         }
         #right-sidebar-resizer {
@@ -203,13 +227,13 @@
             display: block;
             font-size: 14px;
             color: black;
-            width: 400px; /* Fixed width */
-            min-width: 400px; /* Prevent shrinking */
-            max-width: 400px; /* Prevent growing */
+            flex: 1 1 0px; /* Grow to fill space, start from 0 */
+            min-width: 0; /* Absolutely necessary for flex-shrinking to work correctly */
             text-align: left;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: none; /* Override the default max-width for list view */
         }
         .new-filename-placeholder, .canvas-name-placeholder {
             display: none;
@@ -218,18 +242,16 @@
             display: block;
             font-size: 14px;
             color: #555;
-            flex: 2 1 0%;
+            flex: 0 0 auto; /* Size to content, don't grow or shrink */
             text-align: left;
             margin-left: 15px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            min-width: 0;
             font-style: italic;
             border-left: 1px solid #ccc;
             padding-left: 15px;
             min-height: 20px;
-            word-break: break-all;
         }
         .thumbnail-wrapper.list-view .canvas-name-placeholder {
             display: block;
@@ -254,7 +276,7 @@
         .modal {
             display: none;
             position: fixed;
-            z-index: 1000;
+            z-index: 2500; /* Increased z-index */
             left: 0;
             top: 0;
             width: 100%;
@@ -325,6 +347,9 @@
         .landscape-row.selected-edit {
             outline: 3px dashed #DAA520; /* Darker yellow */
         }
+        .landscape-row.selected-shortcut {
+            outline: 3px dashed orange;
+        }
         .landscape-row.selected-play {
             outline: 3px solid cyan;
         }
@@ -346,6 +371,10 @@
             box-shadow: 0 0 0 3px #007bff, 0 4px 8px rgba(0,0,0,0.4);
         }
 
+        .thumbnail-wrapper.list-view.selected {
+            background-color: #d4e8ff;
+        }
+
         #multi-select-btn.active {
             background-color: #d93025 !important;
             color: #ffffff !important;
@@ -353,11 +382,7 @@
         }
 
         #video-overlay {
-            position: absolute;
-            top: 37px; /* Height of top-bar */
-            left: 200px; /* Width of sidebar */
-            right: 0;
-            bottom: 50%;
+            position: fixed; /* Changed from absolute to fixed */
             background-color: rgba(0, 0, 0, 0.8);
             z-index: 2000;
             display: flex;
@@ -547,6 +572,8 @@
             min-width: 160px;
             box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
             z-index: 1;
+            max-height: calc(100vh - 72px); /* Full height minus top and bottom bars */
+            overflow-y: auto;
         }
 
         .dropdown-content a {
@@ -560,7 +587,10 @@
             background-color: #f2f2f2;
         }
 
-        .dropdown-content a:hover {background-color: #f1f1f1;}
+        .dropdown-content a:hover {
+            background-color: #1877f2;
+            color: #ffffff;
+        }
 
         .nested-dropdown {
             position: relative;
@@ -568,12 +598,11 @@
 
         .nested-dropdown-content {
             display: none;
-            position: absolute;
-            left: 100%;
-            top: 0;
+            position: fixed; /* Changed from absolute to fixed */
             background-color: #ffffff;
             min-width: 160px;
             box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 3000; /* Ensure it's on top of everything */
         }
 
         .sidebar-section button.selected-for-removal,
@@ -739,6 +768,7 @@
                             <input type="text" id="project-username-input" style="width: 100%; box-sizing: border-box; background-color: #ffffff; border: 1px solid #444; color: black; padding: 4px;">
                         </div>
                         <a href="#" id="rename-canvas-btn">Rename Canvas</a>
+                        <a href="#" id="manual-rename-btn">Manual Rename</a>
                         <a href="#" id="scan-for-buttons-btn">Scan for Buttons</a>
                         <a href="#" id="remove-all-buttons-btn">Remove All Buttons</a>
                         <div class="nested-dropdown" id="thumbnails-menu">
@@ -774,6 +804,10 @@
                             <label for="horizontal-padding-input" style="display: block; margin-bottom: 5px;">Horizontal Padding (px)</label>
                             <input type="number" id="horizontal-padding-input" min="0" value="10" style="width: 100%; box-sizing: border-box; background-color: #ffffff; border: 1px solid #444; color: black; padding: 4px;">
                         </div>
+                        <div style="padding: 12px 16px; border-top: 1px solid #ddd;">
+                            <label for="preview-vertical-padding-input" style="display: block; margin-bottom: 5px;">Preview Vertical Padding (px)</label>
+                            <input type="number" id="preview-vertical-padding-input" min="0" value="5" style="width: 100%; box-sizing: border-box; background-color: #ffffff; border: 1px solid #444; color: black; padding: 4px;">
+                        </div>
                         <div class="nested-dropdown" id="recent-directories-dropdown">
                             <a href="#">Recent Directories</a>
                             <div class="nested-dropdown-content" id="recent-directories-list">
@@ -794,6 +828,7 @@
         <div class="main-content">
             <div class="top-bar">
                 <button id="test-hook-load-dir" style="display:none;">Test Hook</button>
+                <button id="test-hook-load-padding-dir" style="display:none;">Test Hook Padding</button>
                 <select id="size-selector">
                     <option value="list">List</option>
                     <option value="0.2">20%</option>
@@ -831,6 +866,7 @@
                 <button id="close-canvas-btn" disabled>Close Canvas</button>
                 <button id="toggle-last-canvas-btn" style="display: none;">Toggle Last</button>
                 <button id="play-btn" disabled>Play</button>
+                <button id="delete-selected-btn" disabled>Delete</button>
                 <button id="preview-btn">Preview</button>
             </div>
             <div id="content-area" style="display: flex; flex-grow: 1; overflow: hidden;">
@@ -840,8 +876,9 @@
                 </div>
                 <div class="right-sidebar" id="right-sidebar" style="display: none;">
                     <div id="right-sidebar-resizer"></div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="preview-header">
                         <h3>Preview</h3>
+                        <button id="play-all-preview-btn" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">&#9658;</button>
                         <select id="preview-size-selector">
                             <option value="list">List</option>
                             <option value="0.2">20%</option>
@@ -872,7 +909,7 @@
                     <div id="list-view-button-controls" style="display: none;">
                         <button id="show-thumbnails-btn" class="list-view-toggle-btn">Show Thumbs</button>
                         <button id="show-canvas-name-btn" class="list-view-toggle-btn">Show Canvas</button>
-                        <button id="show-new-filename-btn" class="list-view-toggle-btn">Show New Name</button>
+                        <button id="show-original-filename-btn" class="list-view-toggle-btn">Show Original Name</button>
                     </div>
                 </div>
                 <div id="bottom-bar-info" style="flex-grow: 1; text-align: right;"></div>
@@ -882,6 +919,7 @@
                     <button id="landscape-rotate-btn">Landscape Rotate</button>
                     <button id="delete-btn">Delete</button>
                     <button id="edit-btn">Edit</button>
+                    <button id="shortcut-btn">Create Shortcut</button>
                     <button id="select-btn">Select</button>
                 </div>
             </div>
@@ -919,6 +957,7 @@
     <div id="video-overlay" style="display: none;">
         <div id="video-player-container">
             <video id="video-player" controls></video>
+            <div id="video-filename-display" style="text-align: center; color: white; padding-top: 10px;"></div>
             <button id="video-close-btn">X</button>
             <button id="video-prev-btn">&lt;&lt;</button>
             <button id="video-next-btn">&gt;&gt;</button>
@@ -1023,6 +1062,7 @@
             });
         }
 
+
         function setDb(key, value) {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('thumbnail-tool-db', 1);
@@ -1051,6 +1091,7 @@
                 fontSize: 14,
                 verticalPadding: 10,
                 horizontalPadding: 10,
+                previewVerticalPadding: 5,
                 customButtonTree: [],
                 collapseState: {},
                 buttonVisibility: {},
@@ -1061,7 +1102,10 @@
                 previewThumbnailSize: '0.5',
                 addWritingElement: false,
                 writingElementNumber: 1,
-                hiddenOrphans: []
+                hiddenOrphans: [],
+                listViewShowThumbnails: false,
+                listViewShowCanvasName: false,
+                listViewShowOriginalFilename: false
             };
 
             if (rawData) {
@@ -1102,6 +1146,7 @@
         const selectionBox = document.getElementById('selection-box');
         const contentSpacer = document.getElementById('content-spacer');
         let selectedThumbnails = new Set();
+        let selectedPreviewThumbnails = new Set();
         let allVideoFiles = [];
         const playBtn = document.getElementById('play-btn');
         let scanLayouts = {};
@@ -1134,7 +1179,7 @@
         const listViewButtonControls = document.getElementById('list-view-button-controls');
         const showThumbnailsBtn = document.getElementById('show-thumbnails-btn');
         const showCanvasNameBtn = document.getElementById('show-canvas-name-btn');
-        const showNewFilenameBtn = document.getElementById('show-new-filename-btn');
+        const showOriginalFilenameBtn = document.getElementById('show-original-filename-btn');
         const previewBtn = document.getElementById('preview-btn');
         const rightSidebar = document.getElementById('right-sidebar');
         const previewContainer = document.getElementById('preview-container');
@@ -1152,13 +1197,14 @@
         let lastCanvasIdBeforeRenamed = null;
         let allThumbnails = [];
         let currentDirHandle;
-        let landscapeSelectionMode = ''; // 'landscape' or 'landscape-rotate'
+        var landscapeSelectionMode = ''; // 'landscape' or 'landscape-rotate'
         let preEditModeCanvasMap = new Map();
-        const landscapeSelections = new Set();
-        const landscapeRotateSelections = new Set();
-        const deleteSelections = new Set();
-        const editSelections = new Set();
-        const playSelections = new Set();
+        var landscapeSelections = new Set();
+        var landscapeRotateSelections = new Set();
+        var deleteSelections = new Set();
+        var editSelections = new Set();
+        var shortcutSelections = new Set();
+        var playSelections = new Set();
         let originalPartsForCopyCheck = null;
 
         function updateSidebarActionButtonsState() {
@@ -1288,6 +1334,8 @@
             const nameDiv = thumbWrapper.querySelector('.thumbnail-name');
             const originalFilename = nameDiv ? nameDiv.dataset.originalFilename : thumbWrapper.dataset.fileName;
 
+            document.getElementById('video-filename-display').textContent = originalFilename;
+
             if (!originalFilename) {
                 console.error("Could not find an original filename for the selected thumbnail.", thumbWrapper);
                 return;
@@ -1315,6 +1363,7 @@
             const editModeBtn = document.getElementById('edit-mode-btn');
             const inEditMode = editModeBtn && editModeBtn.textContent.includes('On');
             const renameBtn = document.getElementById('rename-btn');
+            const deleteBtn = document.getElementById('delete-selected-btn');
 
             if (inEditMode) {
                 playBtn.disabled = playSelections.size === 0;
@@ -1322,6 +1371,7 @@
                 sendToCanvasSelect.disabled = true;
                 hideBtn.disabled = true;
                 renameBtn.disabled = true; // Disable in edit mode
+                deleteBtn.disabled = true;
             } else {
                 const numThumbSelected = selectedThumbnails.size;
                 const numButtonSelected = buttonsForRemoval.size;
@@ -1330,6 +1380,7 @@
                 splitBtn.disabled = numThumbSelected === 0;
                 sendToCanvasSelect.disabled = numThumbSelected === 0;
                 hideBtn.disabled = numThumbSelected === 0;
+                deleteBtn.disabled = numThumbSelected === 0;
 
                 const currentCanvas = canvases.get(activeCanvasId);
                 const isRenamedCanvas = currentCanvas && currentCanvas.name === 'Renamed';
@@ -1399,7 +1450,16 @@
             recentDirectoriesDropdown.addEventListener('click', (event) => {
                 event.stopPropagation();
                 const list = document.getElementById('recent-directories-list');
-                list.style.display = list.style.display === 'block' ? 'none' : 'block';
+                const button = event.currentTarget;
+                const rect = button.getBoundingClientRect();
+
+                if (list.style.display === 'block') {
+                    list.style.display = 'none';
+                } else {
+                    list.style.display = 'block';
+                    list.style.top = `${rect.top}px`;
+                    list.style.left = `${rect.right}px`;
+                }
             });
 
             const numElementsInput = document.getElementById('num-elements-input');
@@ -1431,6 +1491,15 @@
                 saveProjectData(directoryName, projectData);
                 isLayoutFrozen = false;
                 layoutThumbnailsInGrid();
+            });
+
+            const previewVerticalPaddingInput = document.getElementById('preview-vertical-padding-input');
+            previewVerticalPaddingInput.addEventListener('change', () => {
+                const projectData = loadProjectData(directoryName);
+                projectData.previewVerticalPadding = previewVerticalPaddingInput.value;
+                saveProjectData(directoryName, projectData);
+                const currentPreviewSize = document.getElementById('preview-size-selector').value;
+                layoutPreviewPane(currentPreviewSize);
             });
 
             const horizontalPaddingInput = document.getElementById('horizontal-padding-input');
@@ -1537,6 +1606,11 @@
             updateSelectionModeButtons();
         });
 
+        document.getElementById('shortcut-btn').addEventListener('click', () => {
+            landscapeSelectionMode = landscapeSelectionMode === 'shortcut' ? '' : 'shortcut';
+            updateSelectionModeButtons();
+        });
+
         document.getElementById('select-btn').addEventListener('click', () => {
             landscapeSelectionMode = landscapeSelectionMode === 'play' ? '' : 'play';
             updateSelectionModeButtons();
@@ -1548,10 +1622,11 @@
                 landscapeRotateSelections.clear();
                 deleteSelections.clear();
                 editSelections.clear();
+                shortcutSelections.clear();
                 playSelections.clear();
 
                 document.querySelectorAll('.landscape-row').forEach(row => {
-                    row.classList.remove('selected-landscape', 'selected-landscape-rotate', 'selected-delete', 'selected-edit', 'selected-play');
+                    row.classList.remove('selected-landscape', 'selected-landscape-rotate', 'selected-delete', 'selected-edit', 'selected-shortcut', 'selected-play');
                 });
             }
         });
@@ -1563,6 +1638,7 @@
             document.getElementById('landscape-rotate-btn').style.backgroundColor = landscapeSelectionMode === 'landscape-rotate' ? red : blue;
             document.getElementById('delete-btn').style.backgroundColor = landscapeSelectionMode === 'delete' ? red : blue;
             document.getElementById('edit-btn').style.backgroundColor = landscapeSelectionMode === 'edit' ? red : blue;
+            document.getElementById('shortcut-btn').style.backgroundColor = landscapeSelectionMode === 'shortcut' ? red : blue;
             document.getElementById('select-btn').style.backgroundColor = landscapeSelectionMode === 'play' ? red : blue;
         }
 
@@ -1699,6 +1775,30 @@
             }
         });
 
+        document.getElementById('manual-rename-btn').addEventListener('click', () => {
+            if (sizeSelector.value !== 'list') {
+                alert('Manual rename is only available in list view.');
+                return;
+            }
+            if (selectedThumbnails.size !== 1) {
+                alert('Please select exactly one file to rename.');
+                return;
+            }
+
+            const thumbnailWrapper = selectedThumbnails.values().next().value;
+            const currentFilename = thumbnailWrapper.dataset.fileName;
+            const newFilename = prompt('Enter new filename:', currentFilename);
+
+            if (newFilename && newFilename.trim() !== '') {
+                const trimmedNewFilename = newFilename.trim();
+                thumbnailWrapper.dataset.fileName = trimmedNewFilename;
+                thumbnailWrapper.querySelector('.thumbnail-name').textContent = trimmedNewFilename;
+                thumbnailWrapper.querySelector('.new-filename-placeholder').textContent = trimmedNewFilename;
+                saveCanvasState();
+                layoutThumbnailsInList(); // Re-apply list view logic
+            }
+        });
+
         renameBtn.addEventListener('click', () => {
             const lastClickedButtonData = JSON.parse(renameBtn.dataset.lastClicked || 'null');
             if (!lastClickedButtonData) {
@@ -1792,7 +1892,7 @@
 
             updateSidebarActionButtonsState();
             updateBottomBarInfo(); // Re-show sidebar button info
-            updatePreviewPanel(); // Refresh the preview panel
+            updatePreviewPanel(lastClickedButtonData); // Refresh the preview panel
         });
 
         removeAllButtonsBtn.addEventListener('click', () => {
@@ -1940,6 +2040,7 @@
             selectedThumbnails.clear();
             updatePlayButtonState();
             updateBottomBarInfo();
+            updatePreviewPanel();
         });
 
         hideBtn.addEventListener('click', () => {
@@ -2137,9 +2238,30 @@
 
 
             if (playlist.length > 0) {
+                const contentArea = document.getElementById('content-area');
+                const rect = contentArea.getBoundingClientRect();
+                videoOverlay.style.top = `${rect.top}px`;
+                videoOverlay.style.left = `${rect.left}px`;
+                videoOverlay.style.width = `${rect.width}px`;
+                videoOverlay.style.height = `${rect.height}px`;
                 videoOverlay.style.display = 'flex';
                 loadVideo(0);
             }
+        });
+
+        document.getElementById('delete-selected-btn').addEventListener('click', () => {
+            let deletedCanvas = Array.from(canvases.values()).find(c => c.name === 'Deleted');
+            if (!deletedCanvas) {
+                const newCanvasId = getNextCanvasId();
+                deletedCanvas = { id: newCanvasId, name: 'Deleted', thumbnails: [], settings: { thumbnailSize: '1' } };
+                canvases.set(newCanvasId, deletedCanvas);
+            }
+
+            selectedThumbnails.forEach(thumb => {
+                thumb.dataset.previousCanvasId = activeCanvasId;
+            });
+            
+            sendThumbnailsToCanvas(deletedCanvas.id);
         });
         videoCloseBtn.addEventListener('click', () => {
             videoOverlay.style.display = 'none';
@@ -2191,14 +2313,30 @@
 
         showThumbnailsBtn.addEventListener('click', () => {
             showThumbnailsBtn.classList.toggle('active');
+            if (directoryName) {
+                const projectData = loadProjectData(directoryName);
+                projectData.listViewShowThumbnails = showThumbnailsBtn.classList.contains('active');
+                saveProjectData(directoryName, projectData);
+            }
             layoutThumbnailsInList();
         });
         showCanvasNameBtn.addEventListener('click', () => {
             showCanvasNameBtn.classList.toggle('active');
+            if (directoryName) {
+                const projectData = loadProjectData(directoryName);
+                projectData.listViewShowCanvasName = showCanvasNameBtn.classList.contains('active');
+                saveProjectData(directoryName, projectData);
+            }
             layoutThumbnailsInList();
         });
-        showNewFilenameBtn.addEventListener('click', () => {
-            showNewFilenameBtn.classList.toggle('active');
+
+        showOriginalFilenameBtn.addEventListener('click', () => {
+            showOriginalFilenameBtn.classList.toggle('active');
+            if (directoryName) {
+                const projectData = loadProjectData(directoryName);
+                projectData.listViewShowOriginalFilename = showOriginalFilenameBtn.classList.contains('active');
+                saveProjectData(directoryName, projectData);
+            }
             layoutThumbnailsInList();
         });
 
@@ -2208,21 +2346,44 @@
             isLayoutFrozen = false;
             const showThumbnails = showThumbnailsBtn.classList.contains('active');
             const showCanvasName = showCanvasNameBtn.classList.contains('active');
-            const showNewFilename = showNewFilenameBtn.classList.contains('active');
+            const showOriginalFilename = showOriginalFilenameBtn.classList.contains('active');
 
-            thumbnailContainer.querySelectorAll('.thumbnail-wrapper').forEach(wrapper => {
+            const wrappers = Array.from(thumbnailContainer.querySelectorAll('.thumbnail-wrapper'));
+            
+            // Always sort by the current (new) filename for consistency
+            wrappers.sort((a, b) => {
+                const nameA = a.dataset.fileName.toLowerCase();
+                const nameB = b.dataset.fileName.toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            wrappers.forEach(wrapper => thumbnailContainer.appendChild(wrapper));
+
+            wrappers.forEach(wrapper => {
                 wrapper.style.position = 'relative';
                 wrapper.style.left = '0px';
                 wrapper.style.top = '0px';
                 wrapper.classList.add('list-view');
 
                 const thumb = wrapper.querySelector('.thumbnail');
+                const nameDiv = wrapper.querySelector('.thumbnail-name');
                 const canvasNamePlaceholder = wrapper.querySelector('.canvas-name-placeholder');
-                const newFilenamePlaceholder = wrapper.querySelector('.new-filename-placeholder');
+                const newFilenamePlaceholder = wrapper.querySelector('.new-filename-placeholder'); // This will now hold the original name
+                
+                const originalFilename = nameDiv.dataset.originalFilename;
+                const newFilename = wrapper.dataset.fileName;
+                const isRenamed = originalFilename !== newFilename;
+
+                // Main display is always the new/current filename
+                nameDiv.textContent = newFilename;
+
+                // The placeholder column shows the original filename
+                newFilenamePlaceholder.textContent = originalFilename;
+
 
                 if (thumb) thumb.style.display = showThumbnails ? 'block' : 'none';
                 if (canvasNamePlaceholder) canvasNamePlaceholder.style.display = showCanvasName ? 'block' : 'none';
-                if (newFilenamePlaceholder) newFilenamePlaceholder.style.display = showNewFilename ? 'block' : 'none';
+                // The visibility of the original name is controlled by the "Show Original Name" button
+                if (newFilenamePlaceholder) newFilenamePlaceholder.style.display = showOriginalFilename ? 'block' : 'none';
             });
             updateContentSpacer();
         }
@@ -2235,6 +2396,9 @@
                 // Reset inline display styles that may have been set by list view
                 const thumb = wrapper.querySelector('.thumbnail');
                 if (thumb) thumb.style.display = '';
+
+                const nameDiv = wrapper.querySelector('.thumbnail-name');
+                if (nameDiv) nameDiv.style.display = 'none';
 
                 const canvasNamePlaceholder = wrapper.querySelector('.canvas-name-placeholder');
                 if (canvasNamePlaceholder) canvasNamePlaceholder.style.display = '';
@@ -2352,6 +2516,7 @@
             document.getElementById('font-size-slider').value = projectData.fontSize;
             document.getElementById('vertical-padding-input').value = projectData.verticalPadding;
             document.getElementById('horizontal-padding-input').value = projectData.horizontalPadding;
+            document.getElementById('preview-vertical-padding-input').value = projectData.previewVerticalPadding;
 
             // --- Restore Preview Sidebar State ---
             const previewSizeSelector = document.getElementById('preview-size-selector');
@@ -2362,6 +2527,11 @@
                 rightSidebar.style.display = 'none';
             }
             previewSizeSelector.value = projectData.previewThumbnailSize || '0.5';
+
+            // --- Restore List View Toggle State ---
+            showThumbnailsBtn.classList.toggle('active', projectData.listViewShowThumbnails);
+            showCanvasNameBtn.classList.toggle('active', projectData.listViewShowCanvasName);
+            showOriginalFilenameBtn.classList.toggle('active', projectData.listViewShowOriginalFilename);
 
             loadCustomButtons(projectData.customButtonTree, projectData.collapseState, projectData.buttonVisibility);
 
@@ -2467,6 +2637,7 @@
             allVideoFiles = [];
             let thumbnailFiles = [];
             let hasThumbnailsSubdir = false;
+            const thumbnailsToUpdate = new Set();
 
             async function recursivelyFindThumbnails(dirHandle, pathPrefix = '') {
                 const thumbnailsDirHandle = await dirHandle.getDirectoryHandle('Thumbnails');
@@ -2594,7 +2765,7 @@
                 });
 
                 const loadedImages = await Promise.all(imageLoadPromises);
-                
+
                 const wrapperMap = new Map();
                 loadedImages.forEach(img => {
                     const wrapper = document.createElement('div');
@@ -2861,6 +3032,7 @@
                         'landscape-rotate': landscapeRotateSelections,
                         'delete': deleteSelections,
                         'edit': editSelections,
+                        'shortcut': shortcutSelections,
                         'play': playSelections
                     };
 
@@ -2887,6 +3059,7 @@
                     rowDiv.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
                     rowDiv.classList.toggle('selected-delete', deleteSelections.has(videoName));
                     rowDiv.classList.toggle('selected-edit', editSelections.has(videoName));
+                    rowDiv.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
                     rowDiv.classList.toggle('selected-play', playSelections.has(videoName));
                     updatePlayButtonState();
                 });
@@ -2896,6 +3069,7 @@
                 if (landscapeRotateSelections.has(videoName)) rowDiv.classList.add('selected-landscape-rotate');
                 if (deleteSelections.has(videoName)) rowDiv.classList.add('selected-delete');
                 if (editSelections.has(videoName)) rowDiv.classList.add('selected-edit');
+                if (shortcutSelections.has(videoName)) rowDiv.classList.add('selected-shortcut');
                 if (playSelections.has(videoName)) rowDiv.classList.add('selected-play');
 
                 const imageLoadPromises = files.map(file => {
@@ -3084,6 +3258,23 @@
             if (editSelections.size > 0) {
                 scriptLines.push('Write-Host "Moving files to Edit folder..."');
                 editSelections.forEach(videoName => processRenamingAndThumbnails(videoName, 'move', 'Edit'));
+                scriptLines.push('');
+            }
+
+            if (shortcutSelections.size > 0) {
+                scriptLines.push('Write-Host "Creating shortcuts..."');
+                scriptLines.push('if (-not (Test-Path -LiteralPath "sc")) { New-Item -ItemType Directory -Path "sc" }');
+                scriptLines.push('$wshell = New-Object -ComObject WScript.Shell');
+                shortcutSelections.forEach(videoName => {
+                    const videoFile = allVideoFiles.find(f => f.name.startsWith(videoName));
+                    if (videoFile) {
+                        const targetPath = videoFile.customPath ? `..\\${videoFile.customPath}\\${videoFile.name}` : `..\\${videoFile.name}`;
+                        const shortcutPath = `$PSScriptRoot\\sc\\${videoFile.name}.lnk`;
+                        scriptLines.push(`$shortcut = $wshell.CreateShortcut("${shortcutPath}")`);
+                        scriptLines.push(`$shortcut.TargetPath = '${targetPath}'`);
+                        scriptLines.push(`$shortcut.Save()`);
+                    }
+                });
                 scriptLines.push('');
             }
             
@@ -3602,8 +3793,7 @@
 
             function renderTree(nodes, parentContainer, level, parentPath) {
                 if (!Array.isArray(nodes)) return;
-
-                // Sort all nodes alphabetically. Special case for '+1' button to always be first.
+                
                 nodes.sort((a, b) => {
                     if (a.name === '+1') return -1;
                     if (b.name === '+1') return 1;
@@ -3638,7 +3828,12 @@
 
                             } else if (startingNode.type === 'category' && Array.isArray(startingNode.children)) {
                                 const newTextParts = [...textParts, startingNode.name];
-                                startingNode.children.forEach(child => {
+                                const sortedChildren = [...startingNode.children].sort((a, b) => {
+                                    if (a.name === '+1') return -1;
+                                    if (b.name === '+1') return 1;
+                                    return a.name.localeCompare(b.name);
+                                });
+                                sortedChildren.forEach(child => {
                                     createButtonsFromSubtree(child, basePath, newTextParts);
                                 });
                             }
@@ -3706,8 +3901,30 @@
                             checkbox.checked = buttonVisibility[startingNode.id] !== false; // Default to visible
                             
                             checkbox.onchange = () => {
-                                projectData.buttonVisibility[startingNode.id] = checkbox.checked;
+                                const buttonId = String(startingNode.id);
+                                projectData.buttonVisibility[buttonId] = checkbox.checked;
+
+                                if (!checkbox.checked) {
+                                    // If the button is being hidden, deselect it from the removal list
+                                    if (buttonsForRemoval.has(buttonId)) {
+                                        buttonsForRemoval.delete(buttonId);
+                                    }
+
+                                    // Also, deselect it from the "rename" state
+                                    const renameBtn = document.getElementById('rename-btn');
+                                    const lastClickedData = JSON.parse(renameBtn.dataset.lastClicked || 'null');
+                                    if (lastClickedData && String(lastClickedData.id) === buttonId) {
+                                        delete renameBtn.dataset.lastClicked;
+                                        updatePreviewPanel(null); // Clear the preview panel as well
+                                    }
+
+                                    updateSidebarActionButtonsState();
+                                    updateBottomBarInfo();
+                                }
+
                                 saveProjectData(directoryName, projectData);
+                                // The loadCustomButtons function will redraw the sidebar, effectively
+                                // removing the .selected-for-removal class from the now-hidden button.
                                 loadCustomButtons(projectData.customButtonTree, projectData.collapseState, projectData.buttonVisibility);
                             };
 
@@ -3816,12 +4033,20 @@
                 const buttonId = button.dataset.id;
                 const isCurrentlySelected = button.classList.contains('selected-for-removal');
                 const renameBtn = document.getElementById('rename-btn');
+                const buttonInfo = { id, name, fullButtonText, specialType, path };
 
                 if (isCurrentlySelected) {
                     buttonsForRemoval.delete(buttonId);
                     button.classList.remove('selected-for-removal');
                     delete renameBtn.dataset.lastClicked;
+                    updatePreviewPanel(null); // Clear the preview
                 } else {
+                    // When switching to a new button, deselect any thumbnails that were manually selected.
+                    if (selectedThumbnails.size > 0) {
+                        selectedThumbnails.forEach(thumb => thumb.classList.remove('selected'));
+                        selectedThumbnails.clear();
+                    }
+                    
                     document.querySelectorAll('#sidebar-scroll-container button.selected-for-removal').forEach(b => {
                         b.classList.remove('selected-for-removal');
                         buttonsForRemoval.delete(b.dataset.id);
@@ -3829,13 +4054,12 @@
                     buttonsForRemoval.add(buttonId);
                     button.classList.add('selected-for-removal');
                     
-                    const buttonInfo = { id, name, fullButtonText, specialType, path };
                     renameBtn.dataset.lastClicked = JSON.stringify(buttonInfo);
+                    updatePreviewPanel(buttonInfo);
                 }
 
                 updateSidebarActionButtonsState();
                 updateBottomBarInfo();
-                updatePreviewPanel();
                 highlightMatchingThumbnails(path, fullButtonText, !isCurrentlySelected, specialType === 'plusOne');
             };
 
@@ -3962,7 +4186,21 @@
             element.addEventListener('dragstart', (e) => e.preventDefault());
             element.onmousedown = dragMouseDown;
 
+            element.addEventListener('dblclick', () => {
+                playlist = [element];
+                const contentArea = document.getElementById('content-area');
+                const rect = contentArea.getBoundingClientRect();
+                videoOverlay.style.top = `${rect.top}px`;
+                videoOverlay.style.left = `${rect.left}px`;
+                videoOverlay.style.width = `${rect.width}px`;
+                videoOverlay.style.height = `${rect.height}px`;
+                videoOverlay.style.display = 'flex';
+                loadVideo(0);
+            });
+
             function dragMouseDown(e) {
+                const isPreview = !!element.closest('#preview-container');
+                
                 e = e || window.event;
                 e.preventDefault();
                 isDragging = false;
@@ -3971,7 +4209,7 @@
                 pos3 = e.clientX;
                 pos4 = e.clientY;
 
-                if (!isLayoutFrozen) {
+                if (!isLayoutFrozen && !isPreview) {
                     freezeLayout();
                 }
 
@@ -3997,11 +4235,12 @@
                 pos3 = e.clientX;
                 pos4 = e.clientY;
 
-                if (selectedThumbnails.has(element)) {
-                    selectedThumbnails.forEach(thumb => {
-                        const containerRect = thumbnailContainer.getBoundingClientRect();
-                        const elementRect = thumb.getBoundingClientRect();
-                        
+                const isPreview = !!element.closest('#preview-container');
+                const container = isPreview ? previewContainer : thumbnailContainer;
+                const selectionSet = isPreview ? selectedPreviewThumbnails : selectedThumbnails;
+
+                if (selectionSet.has(element)) {
+                    selectionSet.forEach(thumb => {
                         let newTop = thumb.offsetTop - pos2;
                         let newLeft = thumb.offsetLeft - pos1;
 
@@ -4012,9 +4251,6 @@
                         thumb.style.left = newLeft + "px";
                     });
                 } else {
-                    const containerRect = thumbnailContainer.getBoundingClientRect();
-                    const elementRect = element.getBoundingClientRect();
-                    
                     let newTop = element.offsetTop - pos2;
                     let newLeft = element.offsetLeft - pos1;
 
@@ -4027,32 +4263,48 @@
             }
 
             function closeDragElement() {
-                 if (!isDragging) {
+                const isPreview = !!element.closest('#preview-container');
+                 if (!isDragging) { // This is a click, not a drag
                     const wrapper = element;
-                    const clickEvent = mouseDownEvent;
-                    if (isMultiSelectMode || clickEvent.ctrlKey || clickEvent.metaKey) {
-                        if (selectedThumbnails.has(wrapper)) {
+                    const clickEvent = mouseDownEvent; // Use the stored mousedown event
+                    const selectionSet = isPreview ? selectedPreviewThumbnails : selectedThumbnails;
+                    
+                    if (isPreview) {
+                        if (selectionSet.has(wrapper)) {
                             wrapper.classList.remove('selected');
-                            selectedThumbnails.delete(wrapper);
+                            selectionSet.delete(wrapper);
                         } else {
                             wrapper.classList.add('selected');
-                            selectedThumbnails.add(wrapper);
+                            selectionSet.add(wrapper);
                         }
-                    } else {
-                        selectedThumbnails.forEach(t => t.classList.remove('selected'));
-                        selectedThumbnails.clear();
-                        wrapper.classList.add('selected');
-                        selectedThumbnails.add(wrapper);
+                    } else { // Main container logic
+                        if (isMultiSelectMode || (clickEvent && (clickEvent.ctrlKey || clickEvent.metaKey))) {
+                            if (selectionSet.has(wrapper)) {
+                                wrapper.classList.remove('selected');
+                                selectionSet.delete(wrapper);
+                            } else {
+                                wrapper.classList.add('selected');
+                                selectionSet.add(wrapper);
+                            }
+                        } else {
+                            selectionSet.forEach(t => t.classList.remove('selected'));
+                            selectionSet.clear();
+                            wrapper.classList.add('selected');
+                            selectionSet.add(wrapper);
+                        }
+                        updatePlayButtonState();
+                        updateBottomBarInfo();
+                        updatePreviewPanel(); // Update preview on selection change
                     }
-                    updatePlayButtonState();
-                    updateBottomBarInfo();
                 }
 
                 document.onmouseup = null;
                 document.onmousemove = null;
 
-                saveCanvasState();
-                updateContentSpacer();
+                if (!isPreview && isDragging) { // Only save/update spacer if something was dragged in main container
+                    saveCanvasState();
+                    updateContentSpacer();
+                }
             }
         }
 
@@ -4355,6 +4607,7 @@
             });
             updatePlayButtonState();
             updateBottomBarInfo();
+            updatePreviewPanel();
             saveCanvasState();
         }
 
@@ -4395,6 +4648,15 @@
             }
         });
 
+        document.getElementById('play-all-preview-btn').addEventListener('click', () => {
+            const previewThumbnails = Array.from(previewContainer.querySelectorAll('.thumbnail-wrapper'));
+            if (previewThumbnails.length > 0) {
+                playlist = previewThumbnails;
+                videoOverlay.style.display = 'flex';
+                loadVideo(0);
+            }
+        });
+
         const rightResizer = document.getElementById('right-sidebar-resizer');
         rightResizer.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -4426,50 +4688,53 @@
             }
         }
 
-        function updatePreviewPanel() {
+        function updatePreviewPanel(buttonData) {
             previewContainer.innerHTML = '';
-            const lastClickedButtonData = JSON.parse(renameBtn.dataset.lastClicked || 'null');
-            if (!lastClickedButtonData) {
-                return; // No button selected, so clear the panel and exit.
+            let thumbnailsToPreview = [];
+
+            if (buttonData) {
+                // If a button is provided, find all matching thumbnails across all canvases.
+                const { path, fullButtonText, specialType } = buttonData;
+                const isCategoryOnly = specialType === 'plusOne';
+                const username = projectUsernameInput.value.trim() || 'username';
+                const category = path[0];
+                const prefix = `[${username}]_${category}`;
+
+                for (const canvas of canvases.values()) {
+                    canvas.thumbnails.forEach(thumb => {
+                        const baseFilename = thumb.dataset.fileName.substring(0, thumb.dataset.fileName.lastIndexOf('.'));
+                        const filenameWithoutNumber = baseFilename.replace(/\s*\(\d+\)$/, '').trim();
+                        
+                        let matches = false;
+                        if (isCategoryOnly) {
+                             matches = filenameWithoutNumber.startsWith(prefix);
+                        } else {
+                            const expectedFilenamePart = `${prefix} ${fullButtonText}`;
+                            matches = filenameWithoutNumber.startsWith(expectedFilenamePart);
+                        }
+
+                        if (matches) {
+                            thumbnailsToPreview.push(thumb);
+                        }
+                    });
+                }
+            } else if (selectedThumbnails.size > 0) {
+                // If no button is provided, use the currently selected thumbnails.
+                thumbnailsToPreview = Array.from(selectedThumbnails);
             }
 
-            const { path, fullButtonText, specialType } = lastClickedButtonData;
-            const isCategoryOnly = specialType === 'plusOne';
-            const username = projectUsernameInput.value.trim() || 'username';
-            const category = path[0];
-            const prefix = `[${username}]_${category}`;
+            thumbnailsToPreview.sort((a, b) => a.dataset.fileName.localeCompare(b.dataset.fileName));
 
-            const matchingThumbnails = [];
-            for (const canvas of canvases.values()) {
-                canvas.thumbnails.forEach(thumb => {
-                    const baseFilename = thumb.dataset.fileName.substring(0, thumb.dataset.fileName.lastIndexOf('.'));
-                    const filenameWithoutNumber = baseFilename.replace(/\s*\(\d+\)$/, '').trim();
-                    
-                    let matches = false;
-                    if (isCategoryOnly) {
-                        matches = filenameWithoutNumber === prefix;
-                    } else {
-                        const expectedFilenamePart = `${prefix} ${fullButtonText}`;
-                        matches = filenameWithoutNumber.startsWith(expectedFilenamePart);
-                    }
-
-                    if (matches) {
-                        matchingThumbnails.push(thumb);
-                    }
-                });
-            }
-
-            matchingThumbnails.sort((a, b) => a.dataset.fileName.localeCompare(b.dataset.fileName));
-
-            matchingThumbnails.forEach(thumb => {
+            thumbnailsToPreview.forEach(thumb => {
                 const clone = thumb.cloneNode(true);
                 clone.style.position = 'relative';
                 clone.style.left = 'auto';
                 clone.style.top = 'auto';
-                clone.style.marginBottom = '10px';
-                clone.classList.remove('selected');
+                clone.style.marginBottom = '5px';
+                clone.classList.remove('selected'); // Clones shouldn't carry over selection state
 
                 makeDraggable(clone);
+                
                 previewContainer.appendChild(clone);
             });
             
@@ -4484,7 +4749,9 @@
             const container = document.getElementById('preview-container');
             if (!container) return;
             const wrappers = container.querySelectorAll('.thumbnail-wrapper');
-            const padding = 5;
+            const projectData = loadProjectData(directoryName);
+            const verticalPadding = Number(projectData.previewVerticalPadding) || 5;
+            const padding = 5; // Horizontal padding remains 5
 
             // Clear any existing absolute positioning before recalculating
             wrappers.forEach(w => {
@@ -4507,20 +4774,26 @@
                     }
                 });
             } else {
-                // Clear inline styles from list view before applying grid
+                // GRID VIEW LOGIC
                 wrappers.forEach(wrapper => {
                     wrapper.classList.remove('list-view');
+                    // Reset/set styles for grid view display
                     const thumb = wrapper.querySelector('.thumbnail');
-                    if(thumb) {
-                        thumb.style.width = '';
-                        thumb.style.height = '';
-                    }
+                    if (thumb) thumb.style.display = ''; // Reset to default display (inline)
+
+                    const nameDiv = wrapper.querySelector('.thumbnail-name');
+                    if (nameDiv) nameDiv.style.display = 'none';
+                    
+                    const canvasNamePlaceholder = wrapper.querySelector('.canvas-name-placeholder');
+                    if (canvasNamePlaceholder) canvasNamePlaceholder.style.display = 'none';
+                    const newFilenamePlaceholder = wrapper.querySelector('.new-filename-placeholder');
+                    if (newFilenamePlaceholder) newFilenamePlaceholder.style.display = 'none';
                 });
 
                 const scale = parseFloat(size);
                 const containerWidth = container.clientWidth;
                 let xOffset = padding;
-                let yOffset = padding;
+                let yOffset = verticalPadding;
                 let maxRowHeight = 0;
 
                 wrappers.forEach(wrapper => {
@@ -4533,23 +4806,20 @@
                     const scaledWidth = originalWidth * scale;
                     const scaledHeight = originalHeight * scale;
 
-                    if (nameDiv) {
-                        nameDiv.style.maxWidth = scaledWidth + 'px';
-                    }
-
-                    // Temporarily make the name visible to get its height for layout, then hide it again.
                     let nameHeight = 0;
                     if (nameDiv) {
-                        nameDiv.style.display = 'block'; // Make it visible to measure
+                        const originalDisplay = nameDiv.style.display;
+                        nameDiv.style.display = 'block'; // Ensure it's visible for measurement
+                        nameDiv.style.maxWidth = scaledWidth + 'px';
                         nameHeight = nameDiv.offsetHeight;
-                        nameDiv.style.display = ''; // Revert to stylesheet default ('none')
+                        nameDiv.style.display = originalDisplay;
                     }
 
                     const wrapperHeight = scaledHeight + nameHeight;
 
                     if (xOffset + scaledWidth + padding > containerWidth && xOffset > padding) {
                         xOffset = padding;
-                        yOffset += maxRowHeight + padding;
+                        yOffset += maxRowHeight + verticalPadding;
                         maxRowHeight = 0;
                     }
                     
@@ -4862,6 +5132,74 @@
             }
         });
 
+        // --- Test hook for the long filename truncation issue ---
+        document.querySelector('.top-bar').insertAdjacentHTML('beforeend', '<button id="test-hook-long-filename" style="display:none;">Test Hook Long Filename</button>');
+        document.getElementById('test-hook-long-filename').addEventListener('click', async () => {
+            const longFilename = '[username]_Misc (Top) (Black Logo Sleeveless Crop 1) (Bedroom 1) (Multiple) (Landscape) (1).jpg';
+            const originalFilename = 'b2 - 7554368673050365206.jpg';
+
+            const thumbnailsDir = new MockDirectoryHandle('Thumbnails', new Map([
+                [longFilename, new MockFileHandle(longFilename)]
+            ]));
+
+            const rootDir = new MockDirectoryHandle('verification-long-filename', new Map([
+                [originalFilename.replace('.jpg', '.mp4'), new MockFileHandle(originalFilename.replace('.jpg', '.mp4'))],
+                ['Thumbnails', thumbnailsDir]
+            ]));
+
+            try {
+                // Manually create a single canvas with the problematic thumbnail
+                canvases.clear();
+                const wrapper = document.createElement('div');
+                wrapper.classList.add('thumbnail-wrapper');
+                wrapper.dataset.fileName = longFilename;
+                const nameDiv = document.createElement('div');
+                nameDiv.classList.add('thumbnail-name');
+                nameDiv.textContent = longFilename;
+                nameDiv.dataset.originalFilename = originalFilename;
+                wrapper.appendChild(nameDiv);
+                 const newFilenameDiv = document.createElement('div');
+                newFilenameDiv.classList.add('new-filename-placeholder');
+                wrapper.appendChild(newFilenameDiv);
+                const canvasNameDiv = document.createElement('div');
+                canvasNameDiv.classList.add('canvas-name-placeholder');
+                wrapper.appendChild(canvasNameDiv);
+
+
+                canvases.set(1, { id: 1, name: 'Canvas 1', thumbnails: [wrapper], settings: { thumbnailSize: '1' } });
+                activeCanvasId = 1;
+                directoryName = 'verification-long-filename';
+
+                renderCanvas(1);
+            } catch(e) {
+                console.error("Error in long-filename test hook:", e);
+            }
+        });
+        
+        document.getElementById('test-hook-load-padding-dir').addEventListener('click', async () => {
+            console.log("Test hook for padding directory clicked");
+            const thumbnailsDir = new MockDirectoryHandle('Thumbnails', new Map([
+                ['video1.jpg', new MockFileHandle('video1.jpg')],
+                ['video2.jpg', new MockFileHandle('video2.jpg')],
+                ['video3.jpg', new MockFileHandle('video3.jpg')]
+            ]));
+
+            const rootDir = new MockDirectoryHandle('verification-padding', new Map([
+                ['video1.mp4', new MockFileHandle('video1.mp4')],
+                ['video2.mp4', new MockFileHandle('video2.mp4')],
+                ['video3.mp4', new MockFileHandle('video3.mp4')],
+                ['Thumbnails', thumbnailsDir]
+            ]));
+
+            try {
+                await processDirectory(rootDir);
+                 console.log("processDirectory for padding dir finished");
+            } catch(e) {
+                console.error("Error in test hook processDirectory:", e);
+            }
+        });
+
     </script>
 </body>
 </html>
+
