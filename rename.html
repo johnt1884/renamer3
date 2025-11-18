@@ -1198,7 +1198,6 @@
         let lastActiveCanvasId = null;
         let lastCanvasIdBeforeRenamed = null;
         let allThumbnails = [];
-        let currentDirHandle;
         var landscapeSelectionMode = ''; // 'landscape' or 'landscape-rotate'
         let preEditModeCanvasMap = new Map();
         var landscapeSelections = new Set();
@@ -2568,7 +2567,7 @@ async function applySelections() {
             document.getElementById('edit-mode-options').style.display = 'none';
 
 
-            currentDirHandle = dirHandle;
+            window.currentDirHandle = dirHandle; // Use the global handle
             await setDb('lastDirectory', dirHandle);
             
             let recentDirs = await getDb('recentDirectories') || [];
@@ -3084,7 +3083,7 @@ async function applySelections() {
             thumbnailContainer.innerHTML = ''; // Clear container for a clean slate
             document.getElementById('landscape-buttons').style.display = 'flex'; // Ensure buttons are visible
 
-            const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
+            const editDirHandle = await window.currentDirHandle.getDirectoryHandle('Edit Thumbnails');
             let landscapeFiles = [];
             for await (const entry of editDirHandle.values()) {
                 if (entry.kind === 'file' && entry.name.match(/\.(jpe?g|png|gif|webp)$/i)) {
@@ -5087,7 +5086,7 @@ async function applySelections() {
 
             let editModeFilesCount = 0;
             try {
-                const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
+                const editDirHandle = await window.currentDirHandle.getDirectoryHandle('Edit Thumbnails');
                 const uniqueVideoNames = new Set();
                 for await (const entry of editDirHandle.values()) {
                     if (entry.kind === 'file' && entry.name.match(/\.(jpe?g|png|gif|webp)$/i)) {
