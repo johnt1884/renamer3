@@ -1268,7 +1268,7 @@ async function applySelections() {
                     if (name.endsWith('.lnk')) {
                         name = name.slice(0, -4);
                     }
-                    const videoName = name.substring(0, name.lastIndexOf('.'));
+                    const videoName = name.replace(/\.[^/.]+$/, "");
                     targetSet.add(videoName);
                 }
             }
