@@ -915,6 +915,7 @@
                 </div>
                 <div id="bottom-bar-info" style="flex-grow: 1; text-align: right;"></div>
                 <div id="landscape-buttons" style="display: none;">
+                    <button id="apply-selections-btn">Apply Selections</button>
                     <button id="deselect-row-btn">Deselect</button>
                     <button id="landscape-btn">Landscape</button>
                     <button id="landscape-rotate-btn">Landscape Rotate</button>
@@ -2567,6 +2568,7 @@
                 const editModeOptions = document.getElementById('edit-mode-options');
                 const editModeBtn = document.getElementById('edit-mode-btn');
                 const generateBatBtn = document.getElementById('generate-edit-bat-btn');
+                const applySelectionsBtn = document.getElementById('apply-selections-btn');
 
                 editModeOptions.style.display = 'block';
                 
@@ -2624,10 +2626,12 @@
                         }
                     });
 
-                    generateBatBtn.addEventListener('click', () => {
-                        generateFinalBatchScript();
+                    generateBatBtn.addEventListener('click', async () => {
+                        await generateFinalBatchScript();
                         document.getElementById('final-landscape-script-modal').style.display = 'block';
                     });
+
+                    applySelectionsBtn.addEventListener('click', applySelections);
                 }
             }
 
@@ -2736,9 +2740,25 @@
             // Always filter out the permanently hidden ones from the main list
             thumbnailFiles = thumbnailFiles.filter(f => !permanentlyHidden.has(f.name));
             
-            if (videosMissingThumbnails.length > 0) {
-                if (confirm(`${videosMissingThumbnails.length} video(s) are missing thumbnails. Would you like to generate a script to create them?`)) {
-                    generateBatchScript(videosMissingThumbnails, directoryName);
+            const videosToConsiderForEdit = allVideoFiles.filter(f => f.customPath === '' || f.customPath === 'Landscape' || f.customPath === 'Landscape Rotate');
+            let editThumbBasenames = new Set();
+            try {
+                const editDirHandle = await dirHandle.getDirectoryHandle('Edit Thumbnails');
+                for await (const entry of editDirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.match(/\.(jpe?g|png|gif|webp)$/i)) {
+                        editThumbBasenames.add(entry.name.substring(0, entry.name.lastIndexOf('_')));
+                    }
+                }
+            } catch (e) {
+                // Edit Thumbnails directory might not exist
+            }
+            const videosMissingEditThumbnails = videosToConsiderForEdit.filter(vf => !editThumbBasenames.has(vf.name.substring(0, vf.name.lastIndexOf('.'))));
+
+            if (videosMissingThumbnails.length > 0 || videosMissingEditThumbnails.length > 0) {
+                if (confirm(`Missing thumbnails were found. Would you like to generate a script to create them?
+- Missing regular thumbnails: ${videosMissingThumbnails.length}
+- Missing edit mode thumbnails: ${videosMissingEditThumbnails.length}`)) {
+                    generateCombinedThumbnailScript(videosMissingThumbnails, videosMissingEditThumbnails);
                     scriptModal.style.display = 'block';
                 }
             }
@@ -2994,6 +3014,20 @@
             thumbnailContainer.innerHTML = ''; // Clear container for a clean slate
             document.getElementById('landscape-buttons').style.display = 'flex'; // Ensure buttons are visible
 
+            // --- Selections.txt logic ---
+            try {
+                await currentDirHandle.getFileHandle('selections.txt');
+                if (confirm('selections.txt already exists. Do you want to update it with the current selections?')) {
+                    await createOrUpdateSelectionsFile();
+                }
+            } catch (e) {
+                if (e.name === 'NotFoundError') {
+                    if (confirm('selections.txt does not exist. Do you want to create it?')) {
+                        await createOrUpdateSelectionsFile();
+                    }
+                }
+            }
+
             const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
             let landscapeFiles = [];
             for await (const entry of editDirHandle.values()) {
@@ -3002,17 +3036,6 @@
                 }
             }
 
-            const videosToConsider = allVideoFiles.filter(f => f.customPath === '' || f.customPath === 'Landscape' || f.customPath === 'Landscape Rotate');
-            const editThumbBasenames = new Set(landscapeFiles.map(f => f.name.substring(0, f.name.lastIndexOf('_'))));
-            const videosMissingThumbs = videosToConsider.filter(vf => !editThumbBasenames.has(vf.name.substring(0, vf.name.lastIndexOf('.'))));
-
-            if (videosMissingThumbs.length > 0) {
-                if (confirm(`${videosMissingThumbs.length} video(s) are missing thumbnails in the 'Edit Thumbnails' directory. Would you like to generate a script to create them?`)) {
-                    generateEditBatchScript(videosMissingThumbs);
-                    editScriptModal.style.display = 'block';
-                    return; // Stop further rendering until the user handles the script.
-                }
-            }
 
             const groupedFiles = landscapeFiles.reduce((acc, file) => {
                 const videoName = file.name.substring(0, file.name.lastIndexOf('_'));
@@ -3191,7 +3214,108 @@
             document.getElementById('download-edit-script-link').href = URL.createObjectURL(blob);
         }
 
-        function generateFinalBatchScript() {
+        async function applySelections() {
+            try {
+                const fileHandle = await currentDirHandle.getFileHandle('selections.txt');
+                const file = await fileHandle.getFile();
+                const contents = await file.text();
+
+                const lines = contents.split('\n');
+                let currentDirectory = '';
+
+                lines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('#')) {
+                        currentDirectory = trimmedLine.substring(1).trim().toLowerCase();
+                    } else if (trimmedLine) {
+                        let baseFilename = trimmedLine;
+                        if (currentDirectory === 'sc' && baseFilename.toLowerCase().endsWith('.lnk')) {
+                            baseFilename = baseFilename.slice(0, -4);
+                        }
+                        const videoName = baseFilename.replace(/\.[^/.]+$/, "");
+
+                        const row = thumbnailContainer.querySelector(`.landscape-row[data-video-name="${videoName}"]`);
+                        if (row) {
+                            let targetSet;
+                            switch (currentDirectory) {
+                                case 'sc':
+                                    targetSet = shortcutSelections;
+                                    break;
+                                case 'landscape':
+                                    targetSet = landscapeSelections;
+                                    break;
+                                case 'landscape rotate':
+                                    targetSet = landscapeRotateSelections;
+                                    break;
+                                case 'edit':
+                                    targetSet = editSelections;
+                                    break;
+                            }
+                            if (targetSet && !targetSet.has(videoName)) {
+                                targetSet.add(videoName);
+                            }
+                        }
+                    }
+                });
+
+                // Update UI based on the new selections
+                document.querySelectorAll('.landscape-row').forEach(row => {
+                    const videoName = row.dataset.videoName;
+                    row.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
+                    row.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
+                    row.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
+                    row.classList.toggle('selected-edit', editSelections.has(videoName));
+                });
+
+                updatePlayButtonState();
+                alert('Selections have been applied from selections.txt.');
+
+            } catch (e) {
+                if (e.name === 'NotFoundError') {
+                    alert('selections.txt not found. Please create it first.');
+                } else {
+                    console.error('Failed to apply selections:', e);
+                    alert('An error occurred while applying selections. See the console for details.');
+                }
+            }
+        }
+
+        async function createOrUpdateSelectionsFile() {
+            let selectionsContent = '';
+            const subdirectories = ['Landscape', 'Landscape Rotate', 'Edit'];
+
+            for (const subdirName of subdirectories) {
+                try {
+                    const subdirHandle = await currentDirHandle.getDirectoryHandle(subdirName);
+                    selectionsContent += `# ${subdirName}\n`;
+                    const entries = [];
+                    for await (const entry of subdirHandle.values()) {
+                        entries.push(entry);
+                    }
+                    for (const entry of entries) {
+                        if (entry.kind === 'file') {
+                            selectionsContent += `${entry.name}\n`;
+                        }
+                    }
+                    selectionsContent += '\n';
+                } catch (e) {
+                    // Directory doesn't exist, which is fine.
+                }
+            }
+
+            try {
+                const fileHandle = await currentDirHandle.getFileHandle('selections.txt', { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(selectionsContent);
+                await writable.close();
+                alert('selections.txt has been created/updated successfully.');
+            } catch (e) {
+                console.error('Failed to write selections.txt:', e);
+                alert('There was an error writing to selections.txt. See the console for details.');
+            }
+        }
+
+        async function generateFinalBatchScript() {
             const scriptLines = [
                 '# PowerShell Script to process video selections',
                 'Write-Host "Creating output directories..."',
@@ -3278,17 +3402,43 @@
                 scriptLines.push('Write-Host "Creating shortcuts..."');
                 scriptLines.push('if (-not (Test-Path -LiteralPath "sc")) { New-Item -ItemType Directory -Path "sc" }');
                 scriptLines.push('$wshell = New-Object -ComObject WScript.Shell');
+
+                const shortcutFileNames = [];
                 shortcutSelections.forEach(videoName => {
                     const videoFile = allVideoFiles.find(f => f.name.startsWith(videoName));
                     if (videoFile) {
                         const targetPath = videoFile.customPath ? `${videoFile.customPath}\\${videoFile.name}` : videoFile.name;
-                        const shortcutPath = `$PSScriptRoot\\sc\\${videoFile.name}.lnk`;
+                        const shortcutFilename = `${videoFile.name}.lnk`;
+                        shortcutFileNames.push(shortcutFilename);
+                        const shortcutPath = `$PSScriptRoot\\sc\\${shortcutFilename}`;
                         scriptLines.push(`$shortcut = $wshell.CreateShortcut("${shortcutPath}")`);
                         scriptLines.push(`$shortcut.TargetPath = Join-Path -Path $PSScriptRoot -ChildPath '${targetPath}'`);
                         scriptLines.push(`$shortcut.Save()`);
                     }
                 });
                 scriptLines.push('');
+
+                // --- New logic to update selections.txt ---
+                try {
+                    const fileHandle = await currentDirHandle.getFileHandle('selections.txt');
+                    const file = await fileHandle.getFile();
+                    let contents = await file.text();
+
+                    const newScSection = `# sc\n${shortcutFileNames.join('\n')}\n`;
+
+                    const scRegex = /(# sc\s*)[\s\S]*?(?=\n# |\n$|$)/;
+                    if (scRegex.test(contents)) {
+                        contents = contents.replace(scRegex, newScSection);
+                    } else {
+                        contents += `\n${newScSection}`;
+                    }
+
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(contents);
+                    await writable.close();
+                } catch (e) {
+                    console.error("Could not update selections.txt with shortcuts:", e);
+                }
             }
             
             
@@ -3435,6 +3585,57 @@
             document.getElementById('download-move-rename-script-link').href = URL.createObjectURL(blob);
         }
 
+
+        function generateCombinedThumbnailScript(missingRegular, missingEdit) {
+            const scriptLines = ['@echo off', 'setlocal enabledelayedexpansion', 'cd /d "%~dp0"'];
+
+            if (missingRegular.length > 0) {
+                scriptLines.push(
+                    'echo Creating Thumbnails directory...',
+                    'if not exist "Thumbnails" mkdir Thumbnails',
+                    'echo Generating regular thumbnails...'
+                );
+                missingRegular.forEach(file => {
+                    const fileName = file.name;
+                    const thumbnailName = fileName.substring(0, fileName.lastIndexOf('.')) + '.jpg';
+                    scriptLines.push(`ffmpeg -y -i "${fileName}" -ss 00:00:02.000 -frames:v 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" "Thumbnails\\${thumbnailName}"`);
+                });
+                scriptLines.push('echo Regular thumbnail generation complete.', '');
+            }
+
+            if (missingEdit.length > 0) {
+                scriptLines.push(
+                    'echo Creating Edit Thumbnails directory...',
+                    'if not exist "Edit Thumbnails" mkdir "Edit Thumbnails"',
+                    'echo Generating edit thumbnails...'
+                );
+                missingEdit.forEach(file => {
+                    const fileName = file.name;
+                    const baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+                    scriptLines.push(
+                        `echo Processing "${fileName}"...`,
+                        `for /f "delims=" %%a in ('ffprobe -v error -show_entries format^=duration -of default^=noprint_wrappers^=1:nokey^=1 "${fileName}"') do (`,
+                        '    set "duration_str=%%a"',
+                        ')',
+                        'for /f "delims=." %%a in ("!duration_str!") do set "duration_int=%%a"',
+                        'if !duration_int! equ 0 set "duration_int=10"',
+                        'set /a "interval = !duration_int! / 10"',
+                        'if !interval! equ 0 set "interval=1"',
+                        'for /l %%i in (1, 1, 10) do (',
+                        '    set /a "timestamp = (%%i - 1) * !interval!"',
+                        `    ffmpeg -ss !timestamp! -i "${fileName}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -y "Edit Thumbnails\\${baseName}_%%i.jpg" >nul 2>&1`,
+                        ')'
+                    );
+                });
+                scriptLines.push('echo Edit thumbnail generation complete.', '');
+            }
+
+            scriptLines.push('echo All thumbnail generation tasks are complete.', 'pause');
+            const script = scriptLines.join('\r\n');
+            batchScriptTextArea.value = script;
+            const blob = new Blob([script], { type: 'text/plain;charset=utf-8' });
+            downloadScriptLink.href = URL.createObjectURL(blob);
+        }
 
         function generateBatchScript(videoFiles, dirName) {
             const scriptLines = [
