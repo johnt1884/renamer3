@@ -817,6 +817,7 @@
                         <a href="#" id="import-project-btn">Import Project</a>
                         <a href="#" id="export-project-btn">Export Project</a>
                         <a href="#" id="recalculate-suffix-btn">Recalculate Suffix</a>
+                        <a href="#" id="hard-refresh-project-btn">Hard Refresh Project</a>
                         <a href="#" id="information-btn">Information</a>
                     </div>
                 </div>
@@ -915,6 +916,7 @@
                 </div>
                 <div id="bottom-bar-info" style="flex-grow: 1; text-align: right;"></div>
                 <div id="landscape-buttons" style="display: none;">
+                    <button id="apply-selections-btn">Apply Selections</button>
                     <button id="deselect-row-btn">Deselect</button>
                     <button id="landscape-btn">Landscape</button>
                     <button id="landscape-rotate-btn">Landscape Rotate</button>
@@ -1197,7 +1199,6 @@
         let lastActiveCanvasId = null;
         let lastCanvasIdBeforeRenamed = null;
         let allThumbnails = [];
-        let currentDirHandle;
         var landscapeSelectionMode = ''; // 'landscape' or 'landscape-rotate'
         let preEditModeCanvasMap = new Map();
         var landscapeSelections = new Set();
@@ -1207,6 +1208,93 @@
         var shortcutSelections = new Set();
         var playSelections = new Set();
         let originalPartsForCopyCheck = null;
+
+        function updateAllRowClasses() {
+            document.querySelectorAll('.landscape-row').forEach(row => {
+                const videoName = row.dataset.videoName;
+                if (!videoName) return;
+
+                // Update UI classes based on the sets
+                row.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
+                row.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
+                row.classList.toggle('selected-delete', deleteSelections.has(videoName));
+                row.classList.toggle('selected-edit', editSelections.has(videoName));
+                row.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
+                row.classList.toggle('selected-play', playSelections.has(videoName));
+            });
+            updatePlayButtonState();
+        }
+
+async function applySelections() {
+    console.log("--- Apply Selections Triggered ---");
+
+    const folderMap = {
+        "Landscape": landscapeSelections,
+        "Landscape Rotate": landscapeRotateSelections,
+        "Edit": editSelections,
+        "sc": shortcutSelections
+    };
+
+    // Clear all sets before applying new selections to ensure a clean slate
+    console.log("Clearing all selection sets...");
+    landscapeSelections.clear();
+    landscapeRotateSelections.clear();
+    editSelections.clear();
+    shortcutSelections.clear();
+
+    console.log("Starting scan of subdirectories...");
+    if (!window.currentDirHandle) {
+        console.error("Directory handle is not available. Cannot apply selections.");
+        alert("A directory handle is missing. Please try reloading the project.");
+        return;
+    }
+    console.log("Current Directory Handle:", window.currentDirHandle.name);
+
+
+    for (const [folderName, targetSet] of Object.entries(folderMap)) {
+        console.log(`Scanning folder: '${folderName}'...`);
+        try {
+            const subDirHandle = await window.currentDirHandle.getDirectoryHandle(folderName);
+            console.log(`Successfully got handle for '${folderName}'.`);
+
+            let fileCount = 0;
+            for await (const entry of subDirHandle.values()) {
+                if (entry.kind === "file") {
+                    fileCount++;
+                    let name = entry.name;
+                     console.log(`  Found file: ${name}`);
+
+                    if (folderName === 'sc' && name.endsWith('.lnk')) {
+                        name = name.slice(0, -4);
+                         console.log(`  It's a shortcut. Base name: ${name}`);
+                    }
+
+                    const videoName = name.replace(/\.[^/.]+$/, "").trim().toLowerCase();
+                    console.log(`  Processed video name: '${videoName}'. Adding to set for '${folderName}'.`);
+                    targetSet.add(videoName);
+                }
+            }
+             console.log(`Found ${fileCount} files in '${folderName}'. Set size is now ${targetSet.size}.`);
+
+        } catch (err) {
+            if (err.name === 'NotFoundError') {
+                console.log(`Folder '${folderName}' not found. Skipping.`);
+            } else {
+                console.error(`Error accessing folder '${folderName}':`, err);
+            }
+        }
+    }
+
+    console.log("--- Final Selection Sets ---");
+    console.log("Landscape:", Array.from(landscapeSelections));
+    console.log("Landscape Rotate:", Array.from(landscapeRotateSelections));
+    console.log("Edit:", Array.from(editSelections));
+    console.log("Shortcuts:", Array.from(shortcutSelections));
+
+    console.log("Updating all row classes in the UI...");
+    updateAllRowClasses();
+    console.log("--- Apply Selections Finished ---");
+}
 
         function updateSidebarActionButtonsState() {
             const numSelected = buttonsForRemoval.size;
@@ -1417,7 +1505,6 @@
             try {
                 const dirHandle = await getDb('lastDirectory');
                 if (dirHandle && typeof dirHandle.queryPermission === 'function') {
-                    // Only check for existing permission; don't request it on page load.
                     if (await dirHandle.queryPermission({ mode: 'read' }) === 'granted') {
                         await processDirectory(dirHandle);
                         directoryLoaded = true;
@@ -1533,7 +1620,8 @@
 
         loadButton.addEventListener('click', async () => {
             try {
-                const dirHandle = await window.showDirectoryPicker();
+                window.currentDirHandle = await window.showDirectoryPicker();
+                const dirHandle = window.currentDirHandle;
                 await processDirectory(dirHandle);
             } catch (err) {
                 if (err.name !== 'AbortError') console.error('Failed to open directory:', err);
@@ -2490,7 +2578,7 @@
             document.getElementById('edit-mode-options').style.display = 'none';
 
 
-            currentDirHandle = dirHandle;
+            window.currentDirHandle = dirHandle; // Use the global handle
             await setDb('lastDirectory', dirHandle);
             
             let recentDirs = await getDb('recentDirectories') || [];
@@ -2541,6 +2629,7 @@
             let hasLandscapeVideos = false;
             let hasLandscapeRotateVideos = false;
             let hasEditVideos = false;
+            let hasScFolder = false;
 
             try {
                 await dirHandle.getDirectoryHandle('Edit Thumbnails');
@@ -2561,6 +2650,11 @@
                 await dirHandle.getDirectoryHandle('Edit');
                 hasEditVideos = true;
             } catch (e) { /* Folder doesn't exist, which is fine. */ }
+
+            try {
+                const scDirHandle = await dirHandle.getDirectoryHandle('sc');
+                hasScFolder = true;
+            } catch (e) { /* sc folder doesn't exist, which is fine. */ }
 
 
             if (hasEditThumbnails) {
@@ -2628,6 +2722,12 @@
                         generateFinalBatchScript();
                         document.getElementById('final-landscape-script-modal').style.display = 'block';
                     });
+
+                    const applyBtn = document.getElementById('apply-selections-btn');
+                     if (!applyBtn.dataset.listenerAttached) {
+                        applyBtn.dataset.listenerAttached = 'true';
+                        applyBtn.addEventListener('click', applySelections);
+                    }
                 }
             }
 
@@ -2680,7 +2780,7 @@
 
             // Find videos in the root and other key directories
             await recursivelyFindVideos(dirHandle, '');
-            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit']) {
+            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit', 'sc']) {
                 try {
                     const subDirHandle = await dirHandle.getDirectoryHandle(subDir);
                     await recursivelyFindVideos(subDirHandle, subDir);
@@ -2877,8 +2977,47 @@
                     const renamedCanvasId = getNextCanvasId();
                     canvases.set(renamedCanvasId, { id: renamedCanvasId, name: 'Renamed', thumbnails: [], settings: { thumbnailSize: '1' } });
                 }
+
+                // After loading canvases (either from save or fresh), check for and apply hard-refresh renames.
+                if (projectData.renames && Object.keys(projectData.renames).length > 0) {
+                    console.log("Applying renames from hard refresh...");
+                    const renamedCanvas = Array.from(canvases.values()).find(c => c.name === 'Renamed');
+                    // All new thumbnails are in canvas 1 after a hard refresh
+                    const sourceCanvas = canvases.get(1);
+
+                    if (renamedCanvas && sourceCanvas) {
+                         const thumbnailsToMove = [];
+                         sourceCanvas.thumbnails.forEach(wrapper => {
+                            const originalFilename = wrapper.querySelector('.thumbnail-name').dataset.originalFilename;
+                            const newFilename = projectData.renames[originalFilename];
+                            if (newFilename) {
+                                // Apply the rename
+                                wrapper.dataset.fileName = newFilename;
+                                wrapper.querySelector('.thumbnail').dataset.fileName = newFilename;
+                                wrapper.querySelector('.thumbnail-name').textContent = newFilename;
+                                const newFilenamePlaceholder = wrapper.querySelector('.new-filename-placeholder');
+                                if (newFilenamePlaceholder) {
+                                    newFilenamePlaceholder.textContent = newFilename;
+                                }
+
+                                // Mark for move
+                                thumbnailsToMove.push(wrapper);
+                            }
+                        });
+
+                        // Move the renamed thumbnails from canvas 1 to the 'Renamed' canvas
+                        if (thumbnailsToMove.length > 0) {
+                            sourceCanvas.thumbnails = sourceCanvas.thumbnails.filter(t => !thumbnailsToMove.includes(t));
+                            renamedCanvas.thumbnails.push(...thumbnailsToMove);
+                        }
+                    }
+
+                    // Clean up the renames object and save
+                    delete projectData.renames;
+                    saveProjectData(directoryName, projectData);
+                }
                 
-                if (projectData.preEditModeCanvasMap) {
+                if (projectData.preEditModeCanvasMap && Object.keys(projectData.preEditModeCanvasMap).length > 0) {
                     const restoreThumbnailsFromPreEditMap = () => {
                         const preEditMap = new Map(Object.entries(projectData.preEditModeCanvasMap));
                         
@@ -2991,22 +3130,44 @@
         }
 
         async function renderEditMode() {
+            console.log("--- Rendering Edit Mode ---");
             thumbnailContainer.innerHTML = ''; // Clear container for a clean slate
             document.getElementById('landscape-buttons').style.display = 'flex'; // Ensure buttons are visible
 
-            const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
+            if (!window.currentDirHandle) {
+                console.error("Directory handle is not available. Cannot render edit mode.");
+                alert("A directory handle is missing. Please try reloading the project.");
+                return;
+            }
+            console.log("Accessing directory handle:", window.currentDirHandle.name);
+
+            let editDirHandle;
+            try {
+                editDirHandle = await window.currentDirHandle.getDirectoryHandle('Edit Thumbnails');
+                console.log("Successfully accessed 'Edit Thumbnails' directory.");
+            } catch (e) {
+                console.error("'Edit Thumbnails' directory not found. Cannot render edit mode.", e);
+                alert("'Edit Thumbnails' directory is missing. Please ensure it exists.");
+                return;
+            }
+
             let landscapeFiles = [];
             for await (const entry of editDirHandle.values()) {
                 if (entry.kind === 'file' && entry.name.match(/\.(jpe?g|png|gif|webp)$/i)) {
                     landscapeFiles.push(await entry.getFile());
                 }
             }
+            console.log(`Found ${landscapeFiles.length} image files in 'Edit Thumbnails'.`);
+
 
             const videosToConsider = allVideoFiles.filter(f => f.customPath === '' || f.customPath === 'Landscape' || f.customPath === 'Landscape Rotate');
+            console.log(`Considering ${videosToConsider.length} video files for thumbnail matching.`);
+
             const editThumbBasenames = new Set(landscapeFiles.map(f => f.name.substring(0, f.name.lastIndexOf('_'))));
             const videosMissingThumbs = videosToConsider.filter(vf => !editThumbBasenames.has(vf.name.substring(0, vf.name.lastIndexOf('.'))));
 
             if (videosMissingThumbs.length > 0) {
+                 console.log(`Found ${videosMissingThumbs.length} videos missing edit thumbnails. Prompting user.`);
                 if (confirm(`${videosMissingThumbs.length} video(s) are missing thumbnails in the 'Edit Thumbnails' directory. Would you like to generate a script to create them?`)) {
                     generateEditBatchScript(videosMissingThumbs);
                     editScriptModal.style.display = 'block';
@@ -3015,13 +3176,14 @@
             }
 
             const groupedFiles = landscapeFiles.reduce((acc, file) => {
-                const videoName = file.name.substring(0, file.name.lastIndexOf('_'));
+                const videoName = file.name.substring(0, file.name.lastIndexOf('_')).trim().toLowerCase();
                 if (!acc[videoName]) {
                     acc[videoName] = [];
                 }
                 acc[videoName].push(file);
                 return acc;
             }, {});
+             console.log(`Grouped thumbnails into ${Object.keys(groupedFiles).length} rows.`);
 
             const videoNames = Object.keys(groupedFiles).sort();
             const allPromises = [];
@@ -4997,7 +5159,7 @@
 
             let editModeFilesCount = 0;
             try {
-                const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
+                const editDirHandle = await window.currentDirHandle.getDirectoryHandle('Edit Thumbnails');
                 const uniqueVideoNames = new Set();
                 for await (const entry of editDirHandle.values()) {
                     if (entry.kind === 'file' && entry.name.match(/\.(jpe?g|png|gif|webp)$/i)) {
@@ -5100,6 +5262,52 @@
                 reader.readAsText(file);
             }
             input.click();
+        });
+
+        document.getElementById('hard-refresh-project-btn').addEventListener('click', () => {
+            if (!directoryName) {
+                alert('Please load a project directory first.');
+                return;
+            }
+            if (!confirm('This will reset the current project, clearing all canvases and thumbnail positions. Custom buttons and renamed files will be preserved. Are you sure you want to continue?')) {
+                return;
+            }
+
+            const projectData = loadProjectData(directoryName);
+            const preservedData = {};
+
+            // Preserve renames
+            const renames = {};
+            if (projectData.canvases && Array.isArray(projectData.canvases.canvases)) {
+                projectData.canvases.canvases.forEach(canvas => {
+                    if (Array.isArray(canvas.thumbnails)) {
+                        canvas.thumbnails.forEach(thumb => {
+                            if (thumb.fileName && thumb.originalFilename && thumb.fileName !== thumb.originalFilename) {
+                                renames[thumb.originalFilename] = thumb.fileName;
+                            }
+                        });
+                    }
+                });
+            }
+            preservedData.renames = renames;
+
+            // Preserve custom buttons and their state
+            preservedData.customButtonTree = projectData.customButtonTree || [];
+            preservedData.collapseState = projectData.collapseState || {};
+            preservedData.buttonVisibility = projectData.buttonVisibility || {};
+
+            // Preserve other important settings
+            preservedData.projectUsername = projectData.projectUsername || '';
+            preservedData.numElements = projectData.numElements || 1;
+            preservedData.fontSize = projectData.fontSize || 14;
+            preservedData.addWritingElement = projectData.addWritingElement || false;
+            preservedData.writingElementNumber = projectData.writingElementNumber || 1;
+
+            // Overwrite the old data with only the preserved parts.
+            // saveProjectData will handle versioning and defaults.
+            saveProjectData(directoryName, preservedData);
+
+            location.reload();
         });
 
         window.onload = init;
