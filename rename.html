@@ -335,22 +335,22 @@
         #filename-builder-modal {
             z-index: 2500;
         }
-        .landscape-row.selected-landscape {
+        .thumbnail-wrapper.selected-landscape {
             outline: 3px dashed blue;
         }
-        .landscape-row.selected-landscape-rotate {
+        .thumbnail-wrapper.selected-landscape-rotate {
             outline: 3px dashed green;
         }
-        .landscape-row.selected-delete {
+        .thumbnail-wrapper.selected-delete {
             outline: 3px dashed purple;
         }
-        .landscape-row.selected-edit {
+        .thumbnail-wrapper.selected-edit {
             outline: 3px dashed #DAA520; /* Darker yellow */
         }
-        .landscape-row.selected-shortcut {
+        .thumbnail-wrapper.selected-shortcut {
             outline: 3px dashed orange;
         }
-        .landscape-row.selected-play {
+        .thumbnail-wrapper.selected-play {
             outline: 3px solid cyan;
         }
         .thumbnail-wrapper {
@@ -3055,31 +3055,44 @@ var initialEditSelections = new Set();
             landscapeButtons.classList.add('edit-mode-active-buttons');
 
             // Pre-populate selections based on existing file locations
-            landscapeSelections = new Set(allVideoFiles.filter(f => f.customPath === 'Landscape').map(f => f.name.substring(0, f.name.lastIndexOf('.'))));
-            landscapeRotateSelections = new Set(allVideoFiles.filter(f => f.customPath === 'Landscape Rotate').map(f => f.name.substring(0, f.name.lastIndexOf('.'))));
-            editSelections = new Set(allVideoFiles.filter(f => f.customPath === 'Edit').map(f => f.name.substring(0, f.name.lastIndexOf('.'))));
-            initialLandscapeSelections = new Set(landscapeSelections);
-            initialLandscapeRotateSelections = new Set(landscapeRotateSelections);
-            initialEditSelections = new Set(editSelections);
+            landscapeSelections.clear();
+            landscapeRotateSelections.clear();
+            editSelections.clear();
             shortcutSelections.clear();
-            initialShortcutSelections.clear();
 
+            // Populate selections for Landscape, Landscape Rotate, and Edit folders
+            for (const file of allVideoFiles) {
+                const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+                if (file.customPath === 'Landscape') {
+                    landscapeSelections.add(baseName);
+                } else if (file.customPath === 'Landscape Rotate') {
+                    landscapeRotateSelections.add(baseName);
+                } else if (file.customPath === 'Edit') {
+                    editSelections.add(baseName);
+                }
+            }
+
+            // Populate selections for shortcuts
             try {
                 const scDirHandle = await currentDirHandle.getDirectoryHandle('sc');
                 for await (const entry of scDirHandle.values()) {
                     if (entry.kind === 'file' && entry.name.endsWith('.lnk')) {
-                        const baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
-                        const videoFile = allVideoFiles.find(f => f.name === baseName);
+                        const videoFileName = entry.name.substring(0, entry.name.lastIndexOf('.'));
+                        const videoFile = allVideoFiles.find(f => f.name === videoFileName);
                         if (videoFile) {
                             const videoBaseName = videoFile.name.substring(0, videoFile.name.lastIndexOf('.'));
                             shortcutSelections.add(videoBaseName);
-                            initialShortcutSelections.add(videoBaseName);
                         }
                     }
                 }
             } catch (e) {
                 // 'sc' directory likely doesn't exist, which is fine.
             }
+
+            initialLandscapeSelections = new Set(landscapeSelections);
+            initialLandscapeRotateSelections = new Set(landscapeRotateSelections);
+            initialEditSelections = new Set(editSelections);
+            initialShortcutSelections = new Set(shortcutSelections);
 
             const editDirHandle = await currentDirHandle.getDirectoryHandle('Edit Thumbnails');
             let landscapeFiles = [];
@@ -3161,33 +3174,40 @@ var initialEditSelections = new Set();
                         }
                     }
 
-                    // Update UI classes
-                    rowDiv.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-delete', deleteSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-edit', editSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-play', playSelections.has(videoName));
+                    // Update UI classes for all wrappers in the row
+                    const wrappers = rowDiv.querySelectorAll('.thumbnail-wrapper');
+                    wrappers.forEach(wrapper => {
+                        wrapper.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
+                        wrapper.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
+                        wrapper.classList.toggle('selected-delete', deleteSelections.has(videoName));
+                        wrapper.classList.toggle('selected-edit', editSelections.has(videoName));
+                        wrapper.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
+                        wrapper.classList.toggle('selected-play', playSelections.has(videoName));
+                    });
                     updatePlayButtonState();
                 });
 
-                 // Re-apply selection classes on initial render
-                if (landscapeSelections.has(videoName)) rowDiv.classList.add('selected-landscape');
-                if (landscapeRotateSelections.has(videoName)) rowDiv.classList.add('selected-landscape-rotate');
-                if (deleteSelections.has(videoName)) rowDiv.classList.add('selected-delete');
-                if (editSelections.has(videoName)) rowDiv.classList.add('selected-edit');
-                if (shortcutSelections.has(videoName)) rowDiv.classList.add('selected-shortcut');
-                if (playSelections.has(videoName)) rowDiv.classList.add('selected-play');
-
                 const imageLoadPromises = files.map(file => {
                     return new Promise((resolve, reject) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.classList.add('thumbnail-wrapper');
+
+                        // Re-apply selection classes on initial render
+                        if (landscapeSelections.has(videoName)) wrapper.classList.add('selected-landscape');
+                        if (landscapeRotateSelections.has(videoName)) wrapper.classList.add('selected-landscape-rotate');
+                        if (deleteSelections.has(videoName)) wrapper.classList.add('selected-delete');
+                        if (editSelections.has(videoName)) wrapper.classList.add('selected-edit');
+                        if (shortcutSelections.has(videoName)) wrapper.classList.add('selected-shortcut');
+                        if (playSelections.has(videoName)) wrapper.classList.add('selected-play');
+
                         const img = new Image();
                         img.onload = () => {
                             img.classList.add('thumbnail');
                             img.dataset.fileName = file.name;
                             img.dataset.originalWidth = img.width;
                             img.dataset.originalHeight = img.height;
-                            rowDiv.appendChild(img);
+                            wrapper.appendChild(img);
+                            rowDiv.appendChild(wrapper);
                             resolve(img);
                         };
                         img.onerror = reject;
@@ -3212,20 +3232,24 @@ var initialEditSelections = new Set();
                 let xOffset = 20;
                 let maxRowHeight = 0;
                 let totalRowWidth = 0;
-                const thumbnails = row.querySelectorAll('.thumbnail');
+                const wrappers = row.querySelectorAll('.thumbnail-wrapper');
                 
-                thumbnails.forEach((thumb, index) => {
+                wrappers.forEach((wrapper, index) => {
+                    const thumb = wrapper.querySelector('.thumbnail');
                     const originalWidth = parseFloat(thumb.dataset.originalWidth);
                     const originalHeight = parseFloat(thumb.dataset.originalHeight);
                     
                     const scaledWidth = originalWidth * scale;
                     const scaledHeight = originalHeight * scale;
 
-                    thumb.style.position = 'absolute';
-                    thumb.style.width = scaledWidth + 'px';
-                    thumb.style.height = scaledHeight + 'px';
-                    thumb.style.left = xOffset + 'px';
-                    thumb.style.top = '0px'; // Position relative to the row
+                    wrapper.style.position = 'absolute';
+                    wrapper.style.width = scaledWidth + 'px';
+                    wrapper.style.height = scaledHeight + 'px';
+                    wrapper.style.left = xOffset + 'px';
+                    wrapper.style.top = '0px'; // Position relative to the row
+
+                    thumb.style.width = '100%';
+                    thumb.style.height = '100%';
 
                     xOffset += scaledWidth + 20;
                     if (scaledHeight > maxRowHeight) {
@@ -3233,7 +3257,7 @@ var initialEditSelections = new Set();
                     }
                 });
 
-                if (thumbnails.length > 0) {
+                if (wrappers.length > 0) {
                     totalRowWidth = xOffset;
                     row.style.width = totalRowWidth + 'px';
                     row.style.height = maxRowHeight + 'px';
@@ -5349,6 +5373,7 @@ const shortcutsToAdd = [...shortcutSelections].filter(x => !initialShortcutSelec
                 console.error("Error in test hook processDirectory:", e);
             }
         });
+
 
         // Test hook for missing edit thumbnails scenario
         document.querySelector('.top-bar').insertAdjacentHTML('beforeend', '<button id="test-hook-missing-edit-thumbs" style="display:none;">Test Hook Missing Edit Thumbs</button>');
