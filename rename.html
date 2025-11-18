@@ -1268,7 +1268,7 @@ async function applySelections() {
                     if (name.endsWith('.lnk')) {
                         name = name.slice(0, -4);
                     }
-                    const videoName = name.replace(/\.[^/.]+$/, "");
+                    const videoName = name.replace(/\.[^/.]+$/, "").trim();
                     targetSet.add(videoName);
                 }
             }
@@ -3104,7 +3104,7 @@ async function applySelections() {
             }
 
             const groupedFiles = landscapeFiles.reduce((acc, file) => {
-                const videoName = file.name.substring(0, file.name.lastIndexOf('_'));
+                const videoName = file.name.substring(0, file.name.lastIndexOf('_')).trim();
                 if (!acc[videoName]) {
                     acc[videoName] = [];
                 }
