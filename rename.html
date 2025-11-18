@@ -2754,7 +2754,7 @@
 
             // Find videos in the root and other key directories
             await recursivelyFindVideos(dirHandle, '');
-            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit']) {
+            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit', 'sc']) {
                 try {
                     const subDirHandle = await dirHandle.getDirectoryHandle(subDir);
                     await recursivelyFindVideos(subDirHandle, subDir);
