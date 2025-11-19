@@ -915,6 +915,7 @@
                 </div>
                 <div id="bottom-bar-info" style="flex-grow: 1; text-align: right;"></div>
                 <div id="landscape-buttons" style="display: none;">
+                    <button id="apply-selections-btn">Apply Selections</button>
                     <button id="deselect-row-btn">Deselect</button>
                     <button id="landscape-btn">Landscape</button>
                     <button id="landscape-rotate-btn">Landscape Rotate</button>
@@ -1206,7 +1207,62 @@
         var editSelections = new Set();
         var shortcutSelections = new Set();
         var playSelections = new Set();
+        let shortcutFileNames = new Set();
         let originalPartsForCopyCheck = null;
+
+        function updateAllRowClasses() {
+            document.querySelectorAll('.landscape-row').forEach(row => {
+                const videoName = row.dataset.videoName;
+                if (!videoName) return;
+
+                // Update UI classes based on the sets
+                row.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
+                row.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
+                row.classList.toggle('selected-delete', deleteSelections.has(videoName));
+                row.classList.toggle('selected-edit', editSelections.has(videoName));
+                row.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
+                row.classList.toggle('selected-play', playSelections.has(videoName));
+            });
+            updatePlayButtonState();
+        }
+
+        async function applySelections() {
+            // Clear all existing selections to start fresh
+            landscapeSelections.clear();
+            landscapeRotateSelections.clear();
+            editSelections.clear();
+            shortcutSelections.clear();
+
+            // Populate selections based on the folder location of the video files
+            allVideoFiles.forEach(file => {
+                const videoName = file.name.substring(0, file.name.lastIndexOf('.'));
+                switch (file.customPath) {
+                    case 'Landscape':
+                        landscapeSelections.add(videoName);
+                        break;
+                    case 'Landscape Rotate':
+                        landscapeRotateSelections.add(videoName);
+                        break;
+                    case 'Edit':
+                        editSelections.add(videoName);
+                        break;
+                }
+            });
+
+            // Populate shortcut selections based on the files found in the 'sc' directory
+            shortcutFileNames.forEach(shortcutFileName => {
+                // e.g., "My Video.mp4.lnk" -> "My Video.mp4"
+                const videoFileName = shortcutFileName.substring(0, shortcutFileName.lastIndexOf('.lnk'));
+                // e.g., "My Video.mp4" -> "My Video"
+                const videoName = videoFileName.substring(0, videoFileName.lastIndexOf('.'));
+                if (videoName) {
+                    shortcutSelections.add(videoName);
+                }
+            });
+
+            // Update the UI to reflect the new selections
+            updateAllRowClasses();
+        }
 
         function updateSidebarActionButtonsState() {
             const numSelected = buttonsForRemoval.size;
@@ -2541,6 +2597,7 @@
             let hasLandscapeVideos = false;
             let hasLandscapeRotateVideos = false;
             let hasEditVideos = false;
+            let hasScFolder = false;
 
             try {
                 await dirHandle.getDirectoryHandle('Edit Thumbnails');
@@ -2561,6 +2618,17 @@
                 await dirHandle.getDirectoryHandle('Edit');
                 hasEditVideos = true;
             } catch (e) { /* Folder doesn't exist, which is fine. */ }
+
+            shortcutFileNames.clear(); // Reset on each directory load
+            try {
+                const scDirHandle = await dirHandle.getDirectoryHandle('sc');
+                hasScFolder = true;
+                for await (const entry of scDirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name.endsWith('.lnk')) {
+                        shortcutFileNames.add(entry.name);
+                    }
+                }
+            } catch (e) { /* sc folder doesn't exist, which is fine. */ }
 
 
             if (hasEditThumbnails) {
@@ -2628,6 +2696,12 @@
                         generateFinalBatchScript();
                         document.getElementById('final-landscape-script-modal').style.display = 'block';
                     });
+
+                    const applyBtn = document.getElementById('apply-selections-btn');
+                     if (!applyBtn.dataset.listenerAttached) {
+                        applyBtn.dataset.listenerAttached = 'true';
+                        applyBtn.addEventListener('click', applySelections);
+                    }
                 }
             }
 
@@ -2680,7 +2754,7 @@
 
             // Find videos in the root and other key directories
             await recursivelyFindVideos(dirHandle, '');
-            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit']) {
+            for (const subDir of ['Landscape', 'Landscape Rotate', 'Edit', 'sc']) {
                 try {
                     const subDirHandle = await dirHandle.getDirectoryHandle(subDir);
                     await recursivelyFindVideos(subDirHandle, subDir);
