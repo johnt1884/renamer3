@@ -335,22 +335,22 @@
         #filename-builder-modal {
             z-index: 2500;
         }
-        .landscape-row.selected-landscape {
+        .thumbnail-wrapper.selected-landscape {
             outline: 3px dashed blue;
         }
-        .landscape-row.selected-landscape-rotate {
+        .thumbnail-wrapper.selected-landscape-rotate {
             outline: 3px dashed green;
         }
-        .landscape-row.selected-delete {
+        .thumbnail-wrapper.selected-delete {
             outline: 3px dashed purple;
         }
-        .landscape-row.selected-edit {
+        .thumbnail-wrapper.selected-edit {
             outline: 3px dashed #DAA520; /* Darker yellow */
         }
-        .landscape-row.selected-shortcut {
+        .thumbnail-wrapper.selected-shortcut {
             outline: 3px dashed orange;
         }
-        .landscape-row.selected-play {
+        .thumbnail-wrapper.selected-play {
             outline: 3px solid cyan;
         }
         .thumbnail-wrapper {
@@ -3067,33 +3067,40 @@
                         }
                     }
 
-                    // Update UI classes
-                    rowDiv.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-delete', deleteSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-edit', editSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
-                    rowDiv.classList.toggle('selected-play', playSelections.has(videoName));
+                    // Update UI classes for all wrappers in the row
+                    const wrappers = rowDiv.querySelectorAll('.thumbnail-wrapper');
+                    wrappers.forEach(wrapper => {
+                        wrapper.classList.toggle('selected-landscape', landscapeSelections.has(videoName));
+                        wrapper.classList.toggle('selected-landscape-rotate', landscapeRotateSelections.has(videoName));
+                        wrapper.classList.toggle('selected-delete', deleteSelections.has(videoName));
+                        wrapper.classList.toggle('selected-edit', editSelections.has(videoName));
+                        wrapper.classList.toggle('selected-shortcut', shortcutSelections.has(videoName));
+                        wrapper.classList.toggle('selected-play', playSelections.has(videoName));
+                    });
                     updatePlayButtonState();
                 });
 
-                 // Re-apply selection classes on initial render
-                if (landscapeSelections.has(videoName)) rowDiv.classList.add('selected-landscape');
-                if (landscapeRotateSelections.has(videoName)) rowDiv.classList.add('selected-landscape-rotate');
-                if (deleteSelections.has(videoName)) rowDiv.classList.add('selected-delete');
-                if (editSelections.has(videoName)) rowDiv.classList.add('selected-edit');
-                if (shortcutSelections.has(videoName)) rowDiv.classList.add('selected-shortcut');
-                if (playSelections.has(videoName)) rowDiv.classList.add('selected-play');
-
                 const imageLoadPromises = files.map(file => {
                     return new Promise((resolve, reject) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.classList.add('thumbnail-wrapper');
+
+                        // Re-apply selection classes on initial render
+                        if (landscapeSelections.has(videoName)) wrapper.classList.add('selected-landscape');
+                        if (landscapeRotateSelections.has(videoName)) wrapper.classList.add('selected-landscape-rotate');
+                        if (deleteSelections.has(videoName)) wrapper.classList.add('selected-delete');
+                        if (editSelections.has(videoName)) wrapper.classList.add('selected-edit');
+                        if (shortcutSelections.has(videoName)) wrapper.classList.add('selected-shortcut');
+                        if (playSelections.has(videoName)) wrapper.classList.add('selected-play');
+
                         const img = new Image();
                         img.onload = () => {
                             img.classList.add('thumbnail');
                             img.dataset.fileName = file.name;
                             img.dataset.originalWidth = img.width;
                             img.dataset.originalHeight = img.height;
-                            rowDiv.appendChild(img);
+                            wrapper.appendChild(img);
+                            rowDiv.appendChild(wrapper);
                             resolve(img);
                         };
                         img.onerror = reject;
@@ -3118,20 +3125,24 @@
                 let xOffset = 20;
                 let maxRowHeight = 0;
                 let totalRowWidth = 0;
-                const thumbnails = row.querySelectorAll('.thumbnail');
+                const wrappers = row.querySelectorAll('.thumbnail-wrapper');
                 
-                thumbnails.forEach((thumb, index) => {
+                wrappers.forEach((wrapper, index) => {
+                    const thumb = wrapper.querySelector('.thumbnail');
                     const originalWidth = parseFloat(thumb.dataset.originalWidth);
                     const originalHeight = parseFloat(thumb.dataset.originalHeight);
                     
                     const scaledWidth = originalWidth * scale;
                     const scaledHeight = originalHeight * scale;
 
-                    thumb.style.position = 'absolute';
-                    thumb.style.width = scaledWidth + 'px';
-                    thumb.style.height = scaledHeight + 'px';
-                    thumb.style.left = xOffset + 'px';
-                    thumb.style.top = '0px'; // Position relative to the row
+                    wrapper.style.position = 'absolute';
+                    wrapper.style.width = scaledWidth + 'px';
+                    wrapper.style.height = scaledHeight + 'px';
+                    wrapper.style.left = xOffset + 'px';
+                    wrapper.style.top = '0px'; // Position relative to the row
+
+                    thumb.style.width = '100%';
+                    thumb.style.height = '100%';
 
                     xOffset += scaledWidth + 20;
                     if (scaledHeight > maxRowHeight) {
@@ -3139,7 +3150,7 @@
                     }
                 });
 
-                if (thumbnails.length > 0) {
+                if (wrappers.length > 0) {
                     totalRowWidth = xOffset;
                     row.style.width = totalRowWidth + 'px';
                     row.style.height = maxRowHeight + 'px';
