@@ -7,48 +7,63 @@ echo ======================================
 echo   SC Utilities
 echo ======================================
 echo.
-echo 1. Update scdate.txt (newest shortcut date)
-echo 2. Update scdata.txt (shortcut listing)
-echo 3. Update BOTH
-echo 4. Generate scnew.txt (for Load SC New)
-echo 5. Update selections.txt (all folders)
-echo 6. Exit
+echo   UPDATES
+echo   ------------------
+echo   1. Update scdate.txt (newest shortcut date)
+echo   2. Update scdata.txt (shortcut listing)
+echo   4. Generate scnew.txt (for Load SC New)
+echo   5. Update selections.txt (for each project)
+echo   3. Perform ALL updates (1, 2, 4, 5)
 echo.
-set /p choice=Choose an option [1-6]:
-
-if "%choice%"=="1" goto SCDATE
-if "%choice%"=="2" goto SCDATA
-if "%choice%"=="3" goto BOTH
-if "%choice%"=="4" goto SCNEW
-if "%choice%"=="5" goto SELECTIONS
-if "%choice%"=="6" goto END
-
+echo   TOOLS
+echo   ------------------
+echo   6. Check Thumbnails
 echo.
-echo Invalid choice.
-pause
-goto MENU
+echo   7. Exit
+echo.
+set /p choices=Choose one or more options (e.g., 1 4 6):
 
+for %%c in (%choices%) do (
+    if "%%c"=="1" call :SCDATE
+    if "%%c"=="2" call :SCDATA
+    if "%%c"=="3" call :ALL_UPDATES
+    if "%%c"=="4" call :SCNEW
+    if "%%c"=="5" call :SELECTIONS
+    if "%%c"=="6" call :CHECK_THUMBNAILS
+    if "%%c"=="7" goto END
+)
 
-:BOTH
-call :DO_SCDATE
-call :DO_SCDATA
 goto DONE
+
+
+:ALL_UPDATES
+call :SCDATE
+call :SCDATA
+call :SCNEW
+call :SELECTIONS
+goto :EOF
 
 :SCDATE
 call :DO_SCDATE
-goto DONE
+goto :EOF
 
 :SCDATA
 call :DO_SCDATA
-goto DONE
+goto :EOF
 
 :SCNEW
 call :DO_SCNEW
-goto DONE
+goto :EOF
 
 :SELECTIONS
 call :DO_SELECTIONS
-goto DONE
+goto :EOF
+
+:CHECK_THUMBNAILS
+echo.
+echo Checking thumbnails...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0\check_thumbnails.ps1"
+goto :EOF
 
 
 :: --------------------------------------------------
@@ -125,24 +140,46 @@ exit /b
 
 
 :: --------------------------------------------------
-:: Update selections.txt in all folders
+:: Update selections.txt for each project subfolder
 :: --------------------------------------------------
 :DO_SELECTIONS
 echo.
 echo Updating selections.txt files...
 
-for /d /r %%D in (.) do (
-    set "OUT=%%D\selections.txt"
-    > "!OUT!" echo.
+REM Process only immediate subdirectories of the current directory
+for /d %%D in (*) do (
+    REM Get just the folder name for comparison
+    set "folderName=%%~nxD"
 
-    for %%F in ("sc" "Landscape" "Landscape Rotate" "Edit") do (
-        echo # %%~F>> "!OUT!"
-        if exist "%%D\%%~F\" (
-            for /f "delims=" %%A in ('dir /b /a:-d "%%D\%%~F" 2^>nul') do (
-                echo %%A>> "!OUT!"
+    REM Create a lowercase version for case-insensitive comparison
+    set "lowerFolderName=!folderName!"
+    for %%C in (A B C D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
+        set "lowerFolderName=!lowerFolderName:%%C=%%c!"
+    )
+
+    REM Check if the folder is one of the special ones to be skipped
+    set "isSpecial=0"
+    if "!lowerFolderName!"=="sc" set "isSpecial=1"
+    if "!lowerFolderName!"=="landscape" set "isSpecial=1"
+    if "!lowerFolderName!"=="landscape rotate" set "isSpecial=1"
+    if "!lowerFolderName!"=="edit" set "isSpecial=1"
+    if "!lowerFolderName!"=="thumbnails" set "isSpecial=1"
+    if "!lowerFolderName!"=="edit thumbnails" set "isSpecial=1"
+
+    if "!isSpecial!"=="0" (
+        echo Processing folder: %%D
+        set "OUT=%%D\selections.txt"
+        > "!OUT!" type nul
+
+        for %%F in ("sc" "Landscape" "Landscape Rotate" "Edit") do (
+            echo # %%~F>> "!OUT!"
+            if exist "%%D\%%~F\" (
+                for /f "delims=" %%A in ('dir /b /a:-d "%%D\%%~F" 2^>nul') do (
+                    echo %%A>> "!OUT!"
+                )
             )
+            echo.>> "!OUT!"
         )
-        echo.>> "!OUT!"
     )
 )
 
