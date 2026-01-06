@@ -154,7 +154,7 @@ foreach ($folder in $allProjectFolders) {
                 $videoPath = $_
                 $thumbName = "$([System.IO.Path]::GetFileNameWithoutExtension($videoPath)).jpg"
                 $thumbPath = Join-Path $regularThumbsDir $thumbName
-                $fixCommands += "ffmpeg -y -i ""$videoPath"" -ss 00:00:02.000 -frames:v 1 -vf ""scale=$thumbWidth:$thumbHeight:force_original_aspect_ratio=decrease"" ""$thumbPath"""
+                $fixCommands += "ffmpeg -y -i ""$videoPath"" -ss 00:00:02.000 -frames:v 1 -vf ""scale=${thumbWidth}:${thumbHeight}:force_original_aspect_ratio=decrease"" ""$thumbPath"""
             }
         }
         if ($projectIssues.MissingEdit.Count -gt 0) {
@@ -175,7 +175,7 @@ foreach ($folder in $allProjectFolders) {
                         $timestamp = ($i - 1) * $interval
                         $thumbName = "${baseName}_${i}.jpg"
                         $thumbPath = Join-Path $editThumbsDir $thumbName
-                        $fixCommands += "ffmpeg -ss $timestamp -i ""$videoPath"" -vframes 1 -vf ""scale=$thumbWidth:$thumbHeight:force_original_aspect_ratio=decrease"" -y ""$thumbPath"" >nul 2>&1"
+                        $fixCommands += "ffmpeg -ss $timestamp -i ""$videoPath"" -vframes 1 -vf ""scale=${thumbWidth}:${thumbHeight}:force_original_aspect_ratio=decrease"" -y ""$thumbPath"" >nul 2>&1"
                     }
                 } catch {
                     Write-Warning "Failed to get duration for $($videoPath). Skipping edit thumbnail generation for this file."
