@@ -107,7 +107,7 @@ foreach ($folder in $allProjectFolders) {
             if ($thumbBasename -in $videoBasenames) {
                 try {
                     $img = [System.Drawing.Image]::FromFile($thumb.FullName)
-                    if ($img.Width -gt $thumbWidth -or $img.Height -gt $thumbHeight -or ($img.Width -ne $thumbWidth -and $img.Height -ne $thumbHeight)) {
+                    if ($img.Width -gt $thumbWidth -or $img.Height -gt $thumbHeight) {
                         $projectIssues.WrongDimensions.Add($thumb.FullName)
                     }
                 } catch {
@@ -127,7 +127,7 @@ foreach ($folder in $allProjectFolders) {
              if ($videoBasename -in $videoBasenames) {
                 try {
                     $img = [System.Drawing.Image]::FromFile($thumb.FullName)
-                    if ($img.Width -gt $thumbWidth -or $img.Height -gt $thumbHeight -or ($img.Width -ne $thumbWidth -and $img.Height -ne $thumbHeight)) {
+                    if ($img.Width -gt $thumbWidth -or $img.Height -gt $thumbHeight) {
                         $projectIssues.WrongDimensions.Add($thumb.FullName)
                     }
                 } catch {
