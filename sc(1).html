@@ -178,6 +178,13 @@
         .checkbox-container input {
             margin-right: 5px;
         }
+        .row-number {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-right: 10px;
+            align-self: center;
+        }
     </style>
 </head>
 <body>
@@ -215,9 +222,16 @@
                     <input type="checkbox" id="show-old-thumbs-checkbox">
                     <label for="show-old-thumbs-checkbox">Show Old</label>
                 </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="show-numbers-checkbox">
+                    <label for="show-numbers-checkbox">Show Numbers</label>
+                </div>
             </div>
             <div id="content-area" style="display: flex; flex-grow: 1; overflow: hidden;">
                 <div id="thumbnail-container">
+                    <div class="landscape-row" data-video-name="video1" data-project-path="ProjectA">
+                        <img class="thumbnail" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-original-width="256" data-original-height="144" style="width: 256px; height: 144px; margin-right: 10px; margin-bottom: 10px;">
+                    </div>
                     <div id="content-spacer" style="position: absolute; top: 0; left: 0; z-index: -1;"></div>
                 </div>
             </div>
@@ -269,6 +283,24 @@
         const mainContainer = document.querySelector('.main-container');
         const showDatesCheckbox = document.getElementById('show-dates-checkbox');
         const showOldThumbsCheckbox = document.getElementById('show-old-thumbs-checkbox');
+        const showNumbersCheckbox = document.getElementById('show-numbers-checkbox');
+
+        function updateRowNumbers() {
+            const showNumbers = showNumbersCheckbox.checked;
+            const rows = document.querySelectorAll('.landscape-row');
+
+            // First, remove any existing numbers to avoid duplicates
+            document.querySelectorAll('.row-number').forEach(num => num.remove());
+
+            if (showNumbers) {
+                rows.forEach((row, index) => {
+                    const numberSpan = document.createElement('span');
+                    numberSpan.className = 'row-number';
+                    numberSpan.textContent = index + 1;
+                    row.insertBefore(numberSpan, row.firstChild);
+                });
+            }
+        }
 
         function init() {
             loadButton.addEventListener('click', async () => {
@@ -435,6 +467,8 @@
             }
         });
 
+        showNumbersCheckbox.addEventListener('change', updateRowNumbers);
+
         function updateContentSpacer() {
             const elements = document.querySelectorAll('.landscape-row, .project-header, hr');
             if (elements.length === 0) {
@@ -468,6 +502,7 @@
                     });
                 }
             });
+            updateRowNumbers();
             requestAnimationFrame(updateContentSpacer);
         }
 
