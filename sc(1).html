@@ -482,11 +482,7 @@
                 if (!groupedByProject.has(sel.projectPath)) {
                     groupedByProject.set(sel.projectPath, []);
                 }
-                // Find the full video file object, which now includes the subfolder
-                const videoFile = allVideoFiles.find(f => f.name === sel.videoName && f.projectPath === sel.projectPath);
-                if (videoFile) {
-                    groupedByProject.get(sel.projectPath).push(videoFile);
-                }
+                groupedByProject.get(sel.projectPath).push(sel);
             });
 
             let scriptLines = [
@@ -495,7 +491,7 @@
                 ''
             ];
 
-            groupedByProject.forEach((videoFiles, projectPath) => {
+            groupedByProject.forEach((selections, projectPath) => {
                 const escapedProjectPath = escapePSString(projectPath);
                 const projectPathVar = projectPath ? `Join-Path -Path $PSScriptRoot -ChildPath '${escapedProjectPath}'` : '$PSScriptRoot';
 
@@ -506,13 +502,12 @@
                 scriptLines.push('if (-not (Test-Path -LiteralPath $scFolder)) { New-Item -ItemType Directory -Path $scFolder | Out-Null }');
                 scriptLines.push('');
 
-                videoFiles.forEach(videoFile => {
-                    const escapedVideoName = escapePSString(videoFile.name);
-                    const escapedSubfolder = escapePSString(videoFile.subfolder);
+                selections.forEach(sel => {
+                    const escapedVideoName = escapePSString(sel.videoName);
+                    const escapedSubfolder = escapePSString(sel.subfolder);
 
-                    // Construct the target path including the subfolder if it exists
                     let targetPathConstruction = `$projectFolder`;
-                    if (videoFile.subfolder) {
+                    if (sel.subfolder) {
                         targetPathConstruction = `Join-Path -Path ${targetPathConstruction} -ChildPath '${escapedSubfolder}'`;
                     }
                     targetPathConstruction = `Join-Path -Path ${targetPathConstruction} -ChildPath '${escapedVideoName}'`;
@@ -755,7 +750,11 @@
 
                     rowDiv.addEventListener('click', () => {
                         rowDiv.classList.toggle('selected-shortcut');
-                        const selectionData = { videoName: videoName, projectPath: project.path };
+                        const selectionData = {
+                            videoName: videoFile.name,
+                            projectPath: project.path,
+                            subfolder: videoFile.subfolder
+                        };
                         
                         let found = false;
                         shortcutSelections.forEach(s => {
@@ -906,7 +905,11 @@
                         rowDiv.dataset.videoName = videoInfo.videoName;
                         rowDiv.dataset.projectPath = projectPath;
                         
-                        const selectionData = { videoName: videoInfo.videoName, projectPath: projectPath };
+                        const selectionData = {
+                            videoName: videoInfo.videoFile.name,
+                            projectPath: projectPath,
+                            subfolder: videoInfo.videoFile.subfolder
+                        };
                         for (const s of shortcutSelections) {
                             if (s.videoName === selectionData.videoName && s.projectPath === selectionData.projectPath) {
                                 rowDiv.classList.add('selected-shortcut');
@@ -918,7 +921,6 @@
 
                         rowDiv.addEventListener('click', () => {
                             rowDiv.classList.toggle('selected-shortcut');
-                            const selectionData = { videoName: videoInfo.videoName, projectPath: projectPath };
                             
                             let found = false;
                             shortcutSelections.forEach(s => {
