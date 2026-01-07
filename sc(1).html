@@ -178,6 +178,13 @@
         .checkbox-container input {
             margin-right: 5px;
         }
+        .row-number {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-right: 10px;
+            align-self: center;
+        }
     </style>
 </head>
 <body>
@@ -215,9 +222,16 @@
                     <input type="checkbox" id="show-old-thumbs-checkbox">
                     <label for="show-old-thumbs-checkbox">Show Old</label>
                 </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="show-numbers-checkbox">
+                    <label for="show-numbers-checkbox">Show Numbers</label>
+                </div>
             </div>
             <div id="content-area" style="display: flex; flex-grow: 1; overflow: hidden;">
                 <div id="thumbnail-container">
+                    <div class="landscape-row" data-video-name="video1" data-project-path="ProjectA">
+                        <img class="thumbnail" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-original-width="256" data-original-height="144" style="width: 256px; height: 144px; margin-right: 10px; margin-bottom: 10px;">
+                    </div>
                     <div id="content-spacer" style="position: absolute; top: 0; left: 0; z-index: -1;"></div>
                 </div>
             </div>
@@ -269,6 +283,24 @@
         const mainContainer = document.querySelector('.main-container');
         const showDatesCheckbox = document.getElementById('show-dates-checkbox');
         const showOldThumbsCheckbox = document.getElementById('show-old-thumbs-checkbox');
+        const showNumbersCheckbox = document.getElementById('show-numbers-checkbox');
+
+        function updateRowNumbers() {
+            const showNumbers = showNumbersCheckbox.checked;
+            const rows = document.querySelectorAll('.landscape-row');
+
+            // First, remove any existing numbers to avoid duplicates
+            document.querySelectorAll('.row-number').forEach(num => num.remove());
+
+            if (showNumbers) {
+                rows.forEach((row, index) => {
+                    const numberSpan = document.createElement('span');
+                    numberSpan.className = 'row-number';
+                    numberSpan.textContent = index + 1;
+                    row.insertBefore(numberSpan, row.firstChild);
+                });
+            }
+        }
 
         function init() {
             loadButton.addEventListener('click', async () => {
@@ -435,6 +467,8 @@
             }
         });
 
+        showNumbersCheckbox.addEventListener('change', updateRowNumbers);
+
         function updateContentSpacer() {
             const elements = document.querySelectorAll('.landscape-row, .project-header, hr');
             if (elements.length === 0) {
@@ -468,6 +502,7 @@
                     });
                 }
             });
+            updateRowNumbers();
             requestAnimationFrame(updateContentSpacer);
         }
 
@@ -482,55 +517,45 @@
                 if (!groupedByProject.has(sel.projectPath)) {
                     groupedByProject.set(sel.projectPath, []);
                 }
-                groupedByProject.get(sel.projectPath).push(sel.videoName);
+                groupedByProject.get(sel.projectPath).push(sel);
             });
-            
+
             let scriptLines = [
                 '$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition',
                 '$wshell = New-Object -ComObject WScript.Shell',
                 ''
             ];
-            
-            groupedByProject.forEach((videoNames, projectPath) => {
+
+            groupedByProject.forEach((selections, projectPath) => {
                 const escapedProjectPath = escapePSString(projectPath);
                 const projectPathVar = projectPath ? `Join-Path -Path $PSScriptRoot -ChildPath '${escapedProjectPath}'` : '$PSScriptRoot';
-                
+
                 scriptLines.push(`Write-Host "Processing project: ${projectPath || '(Root)'}"`);
                 scriptLines.push(`$projectFolder = ${projectPathVar}`);
                 scriptLines.push(`$scFolder = Join-Path -Path $projectFolder -ChildPath 'sc'`);
                 scriptLines.push('');
-
-                scriptLines.push("# Create the 'sc' folder if it doesn't exist");
-                scriptLines.push('if (-not (Test-Path -LiteralPath $scFolder)) {');
-                scriptLines.push('    New-Item -ItemType Directory -Path $scFolder | Out-Null');
-                scriptLines.push('}');
+                scriptLines.push('if (-not (Test-Path -LiteralPath $scFolder)) { New-Item -ItemType Directory -Path $scFolder | Out-Null }');
                 scriptLines.push('');
 
-                scriptLines.push('# List of video files');
-                scriptLines.push('$videoFiles = @(');
-                
-                const videoFileNames = videoNames.map(videoName => {
-                    const videoFile = allVideoFiles.find(f => f.name.startsWith(videoName));
-                    return videoFile ? videoFile.name : null;
-                }).filter(name => name !== null);
+                selections.forEach(sel => {
+                    const escapedVideoName = escapePSString(sel.videoName);
+                    const escapedSubfolder = escapePSString(sel.subfolder);
 
-                videoFileNames.forEach(fileName => {
-                    scriptLines.push(`    '${escapePSString(fileName)}'`);
+                    let targetPathConstruction = `$projectFolder`;
+                    if (sel.subfolder) {
+                        targetPathConstruction = `Join-Path -Path ${targetPathConstruction} -ChildPath '${escapedSubfolder}'`;
+                    }
+                    targetPathConstruction = `Join-Path -Path ${targetPathConstruction} -ChildPath '${escapedVideoName}'`;
+
+                    scriptLines.push(`    $targetPath = ${targetPathConstruction}`);
+                    scriptLines.push(`    $shortcutPath = Join-Path -Path $scFolder -ChildPath ('${escapedVideoName}' + '.lnk')`);
+                    scriptLines.push('    $shortcut = $wshell.CreateShortcut($shortcutPath)');
+                    scriptLines.push('    $shortcut.TargetPath = $targetPath');
+                    scriptLines.push('    $shortcut.Save()');
+                    scriptLines.push('');
                 });
-                scriptLines.push(')');
-                scriptLines.push('');
-                
-                scriptLines.push('foreach ($video in $videoFiles) {');
-                scriptLines.push('    $targetPath = Join-Path -Path $projectFolder -ChildPath $video');
-                scriptLines.push("    $shortcutPath = Join-Path -Path $scFolder -ChildPath ($video + '.lnk')");
-                scriptLines.push('');
-                scriptLines.push('    $shortcut = $wshell.CreateShortcut($shortcutPath)');
-                scriptLines.push('    $shortcut.TargetPath = $targetPath');
-                scriptLines.push('    $shortcut.Save()');
-                scriptLines.push('}');
-                scriptLines.push('');
             });
-            
+
             scriptLines.push('Write-Host "Shortcut creation complete."');
             scriptLines.push('Read-Host -Prompt "Press Enter to exit"');
 
@@ -677,11 +702,21 @@
                     : 'No scdate.txt found';
 
                 const projectVideoFiles = [];
-                for await (const entry of project.handle.values()) {
-                    if (entry.kind === 'file' && entry.name.match(/\.(mp4|avi|mov|mkv)$/i)) {
-                        projectVideoFiles.push(await entry.getFile());
+                // Recursively find videos in subfolders
+                async function findVideos(dirHandle, subfolder = '') {
+                    for await (const entry of dirHandle.values()) {
+                        if (entry.kind === 'file' && entry.name.match(/\.(mp4|avi|mov|mkv)$/i)) {
+                            const file = await entry.getFile();
+                            // Store additional path info on the file object
+                            file.subfolder = subfolder;
+                            file.projectPath = project.path;
+                            projectVideoFiles.push(file);
+                        } else if (entry.kind === 'directory' && entry.name.toLowerCase() !== 'edit thumbnails' && entry.name.toLowerCase() !== 'thumbnails' && entry.name.toLowerCase() !== 'sc') {
+                            await findVideos(entry, subfolder ? `${subfolder}\\${entry.name}` : entry.name);
+                        }
                     }
                 }
+                await findVideos(project.handle);
                 allVideoFiles.push(...projectVideoFiles);
 
                 const editDirHandle = await findDirectoryHandleByName(project.handle, 'Edit Thumbnails');
@@ -750,7 +785,11 @@
 
                     rowDiv.addEventListener('click', () => {
                         rowDiv.classList.toggle('selected-shortcut');
-                        const selectionData = { videoName: videoName, projectPath: project.path };
+                        const selectionData = {
+                            videoName: videoFile.name,
+                            projectPath: project.path,
+                            subfolder: videoFile.subfolder
+                        };
                         
                         let found = false;
                         shortcutSelections.forEach(s => {
@@ -901,7 +940,11 @@
                         rowDiv.dataset.videoName = videoInfo.videoName;
                         rowDiv.dataset.projectPath = projectPath;
                         
-                        const selectionData = { videoName: videoInfo.videoName, projectPath: projectPath };
+                        const selectionData = {
+                            videoName: videoInfo.videoFile.name,
+                            projectPath: projectPath,
+                            subfolder: videoInfo.videoFile.subfolder
+                        };
                         for (const s of shortcutSelections) {
                             if (s.videoName === selectionData.videoName && s.projectPath === selectionData.projectPath) {
                                 rowDiv.classList.add('selected-shortcut');
@@ -913,7 +956,6 @@
 
                         rowDiv.addEventListener('click', () => {
                             rowDiv.classList.toggle('selected-shortcut');
-                            const selectionData = { videoName: videoInfo.videoName, projectPath: projectPath };
                             
                             let found = false;
                             shortcutSelections.forEach(s => {
